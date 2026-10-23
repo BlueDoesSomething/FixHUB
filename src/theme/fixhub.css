@@ -1,0 +1,9 @@
+/* FIXHUB Theme Overrides
+   The app uses the light theme defined in variables.css.
+   Pages (Splash, Login, app tabs) set their own scoped backgrounds. */
+:root {
+  --ion-background-color: #f4fafc;
+  --ion-background-color-rgb: 244, 250, 252;
+  --ion-text-color: #12211a;
+  --ion-text-color-rgb: 11, 45, 92;
+}
