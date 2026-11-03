@@ -48,7 +48,7 @@ const router = useRouter();
 const route = useRoute();
 const { profile: getProfile } = useAuth();
 
-const profile = getProfile();
+const profile = computed(getProfile);
 const roleLabel = computed(() => {
   const r = props.role;
   return r.charAt(0).toUpperCase() + r.slice(1);
@@ -97,7 +97,7 @@ function goToProfile() {
   display: none;
   flex-direction: column;
   width: 268px;
-  height: 100vh;
+  height: 100%;
   background: #fff;
   border-right: 1px solid var(--hairline);
   flex-shrink: 0;
@@ -106,7 +106,7 @@ function goToProfile() {
   z-index: 100;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .fx-sidenav { display: flex; }
 }
 

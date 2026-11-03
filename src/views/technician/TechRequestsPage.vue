@@ -32,7 +32,7 @@ import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
 import RequestCard from '../../components/RequestCard.vue';
-import { newRequests, type ServiceRequest } from '../../data/mock';
+import { newRequests, type ServiceRequest } from '../../data/catalog';
 
 const router = useRouter();
 const requests = ref<ServiceRequest[]>([...newRequests]);

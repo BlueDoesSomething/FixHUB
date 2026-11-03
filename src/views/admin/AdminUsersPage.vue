@@ -13,6 +13,7 @@
 
         <div class="fx-table">
           <h4 class="fx-table__title">All Customers</h4>
+          <p v-if="!users.length" class="fx-page__sub">No customer records available.</p>
           <div v-for="u in users" :key="u.id" class="fx-table__row">
             <div class="fx-table__avatar">{{ u.initials }}</div>
             <div class="fx-table__info">
@@ -33,9 +34,5 @@
 import { IonPage, IonContent } from '@ionic/vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
 
-const users = [
-  { id: 1, initials: 'AR', name: 'Alex Rivera', email: 'alex.rivera@email.com', active: true },
-  { id: 2, initials: 'MS', name: 'Maria Santos', email: 'maria.santos@email.com', active: true },
-  { id: 3, initials: 'RC', name: 'Rico Cruz', email: 'rico.cruz@email.com', active: false },
-];
+const users: { id: string; initials: string; name: string; email: string; active: boolean }[] = [];
 </script>

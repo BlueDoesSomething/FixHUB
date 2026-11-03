@@ -1,0 +1,74 @@
+query GetMyProfile @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) {
+    id
+    fullName
+    email
+    phone
+    city
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+fragment ApplicationDetails on TechnicianApplication {
+  id
+  applicantId
+  fullName
+  email
+  contactNumber
+  city
+  yearsExperience
+  brands
+  specializations
+  experienceDescription
+  serviceType
+  coverageArea
+  workingDays
+  workingHours
+  status
+  feedback
+  reviewedAt
+  createdAt
+  updatedAt
+  applicationEvents_on_application(orderBy: { createdAt: ASC }) {
+    status
+    note
+    createdAt
+    actor { fullName }
+  }
+}
+
+query GetMyApplication @auth(level: USER) {
+  technicianApplications(where: { applicantId: { eq_expr: "auth.uid" } }, limit: 1) {
+    ...ApplicationDetails
+  }
+}
+
+query AdminListApplications @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) @redact {
+    role @check(expr: "this == 'ADMIN'", message: "Administrator access required.")
+  }
+  technicianApplications(orderBy: { createdAt: DESC }, limit: 100) {
+    ...ApplicationDetails
+  }
+}
+
+query ListMyRepairRequests @auth(level: USER) {
+  repairRequests(
+    where: { customerId: { eq_expr: "auth.uid" } }
+    orderBy: { createdAt: DESC }
+    limit: 100
+  ) {
+    id
+    device
+    brand
+    model
+    problem
+    serviceType
+    location
+    status
+    createdAt
+    updatedAt
+  }
+}

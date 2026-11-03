@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import InitialAvatar from './InitialAvatar.vue';
-import type { ServiceRequest } from '../data/mock';
+import type { ServiceRequest } from '../data/catalog';
 
 defineProps<{ request: ServiceRequest }>();
 const emit = defineEmits<{ accept: [req: ServiceRequest]; reject: [req: ServiceRequest] }>();

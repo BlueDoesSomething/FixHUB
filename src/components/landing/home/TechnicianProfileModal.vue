@@ -36,16 +36,16 @@
         </div>
 
         <div class="modal__section">
-          <h4 class="modal__section-title">Exact Location</h4>
+          <h4 class="modal__section-title">Service location</h4>
           <div class="modal__location">
             <i data-lucide="navigation" class="w-4 h-4"></i>
             <span>{{ tech.location }}</span>
           </div>
           <div class="modal__map">
-            <MapCanvas :vh="300" height="260px" :markers="markers" :route="route" />
+            <MapCanvas height="280px" :markers="markers" :label="`${tech.name} service location`" />
           </div>
           <div class="modal__legend">
-            <span class="leg"><span class="leg__dot leg__dot--you"></span> Your location</span>
+            <span v-if="draft.coordinates" class="leg"><span class="leg__dot leg__dot--you"></span> Your selected location</span>
             <span class="leg"><span class="leg__dot leg__dot--tech"></span> {{ tech.name }}</span>
           </div>
         </div>
@@ -70,25 +70,27 @@ import { computed, onMounted, watch } from 'vue';
 import MapCanvas from '../../MapCanvas.vue';
 import type { MapMarker } from '../../../types/map';
 import type { LandingTechnician } from '../../../data/landing/technicians';
+import { useRepairDraft } from '../../../stores/repair';
 
 const props = defineProps<{ tech: LandingTechnician | null }>();
 const emit = defineEmits<{ close: []; request: [tech: LandingTechnician] }>();
 
-const YOU = { x: 200, y: 180 };
+const { draft } = useRepairDraft();
 
 const markers = computed<MapMarker[]>(() => {
   if (!props.tech) return [];
-  return [
-    { x: YOU.x, y: YOU.y, kind: 'dest' },
-    { x: props.tech.mapX, y: props.tech.mapY, kind: 'pulse', label: props.tech.initials, color: props.tech.markerColor },
-  ];
-});
-
-const route = computed(() => {
-  if (!props.tech) return undefined;
-  const mx = (props.tech.mapX + YOU.x) / 2;
-  const my = (props.tech.mapY + YOU.y) / 2 - 40;
-  return `M ${props.tech.mapX} ${props.tech.mapY} Q ${mx} ${my} ${YOU.x} ${YOU.y}`;
+  const points: MapMarker[] = [{
+    ...props.tech.coordinates,
+    id: `tech-${props.tech.id}`,
+    kind: 'pulse',
+    label: props.tech.initials,
+    title: props.tech.name,
+    color: props.tech.markerColor,
+  }];
+  if (draft.coordinates) {
+    points.push({ ...draft.coordinates, id: 'customer', kind: 'dest', title: 'Your selected location' });
+  }
+  return points;
 });
 
 const refreshIcons = () => {
@@ -192,6 +194,7 @@ watch(() => props.tech, refreshIcons);
 }
 .modal__map { border-radius: 16px; overflow: hidden; border: 1px solid var(--hairline); }
 .modal__legend { display: flex; gap: 18px; margin-top: 12px; font-size: 12px; color: var(--text-muted); }
+.modal__map-note { font-size: 12px; line-height: 1.6; color: var(--text-muted); margin: 10px 0 0; }
 .leg { display: inline-flex; align-items: center; gap: 7px; }
 .leg__dot { width: 10px; height: 10px; border-radius: 50%; }
 .leg__dot--you { background: #ef4444; }

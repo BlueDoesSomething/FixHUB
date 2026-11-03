@@ -148,7 +148,8 @@
             </div>
           </div>
 
-          <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <p v-if="!technicians.length" class="clean-card p-6 text-center text-slate-600">No technicians are available to display.</p>
+          <div v-else class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div v-for="tech in technicians" :key="tech.id" class="clean-card p-6 relative">
               <div :class="['absolute top-4 right-4 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5', tech.available ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-500 border border-slate-200']">
                 <span :class="['w-1.5 h-1.5 rounded-full', tech.available ? 'bg-green-500 animate-pulse' : 'bg-slate-400']"></span>
@@ -208,7 +209,7 @@
                 <i data-lucide="zap" class="w-4 h-4"></i> Get Started Today
               </div>
               <h2 class="text-4xl md:text-5xl font-extrabold text-white mb-6 leading-tight">Ready to Fix Your Device?</h2>
-              <p class="text-white/80 text-lg max-w-2xl mx-auto mb-10">Join thousands of satisfied customers who trust FIXHUB for their device repair needs.</p>
+              <p class="text-white/80 text-lg max-w-2xl mx-auto mb-10">Create your account to get started with FIXHUB.</p>
               <div class="flex flex-col sm:flex-row gap-4 justify-center">
                 <button @click="focusForm" class="group px-8 py-4 rounded-2xl bg-brand-accent text-white font-bold text-base hover:bg-brand-accentHover transition-all flex items-center justify-center gap-3 shadow-lg shadow-black/20">
                   Request a Repair Now <i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
@@ -216,11 +217,6 @@
                 <a href="#technicians" class="group px-8 py-4 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md text-white font-bold text-base hover:bg-white/20 transition-all flex items-center justify-center gap-3">
                   Browse Technicians <i data-lucide="users" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
                 </a>
-              </div>
-              <div class="mt-12 pt-8 border-t border-white/20 grid grid-cols-3 gap-6 max-w-2xl mx-auto">
-                <div><div class="text-3xl font-extrabold text-brand-accent">5,291+</div><div class="text-xs text-white/70 mt-1">Repairs Completed</div></div>
-                <div><div class="text-3xl font-extrabold text-brand-accent">184</div><div class="text-xs text-white/70 mt-1">Verified Technicians</div></div>
-                <div><div class="text-3xl font-extrabold text-brand-accent flex items-center justify-center gap-1">4.9 <i data-lucide="star" class="w-5 h-5 text-brand-accent fill-brand-accent"></i></div><div class="text-xs text-white/70 mt-1">Average Rating</div></div>
               </div>
             </div>
           </div>

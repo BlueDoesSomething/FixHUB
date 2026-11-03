@@ -13,9 +13,7 @@
 import { onMounted, watch } from 'vue';
 import AuthForm from './AuthForm.vue';
 
-const props = withDefaults(defineProps<{ open: boolean; redirect?: string }>(), {
-  redirect: '/client/home',
-});
+const props = defineProps<{ open: boolean; redirect?: string }>();
 const emit = defineEmits<{ close: [] }>();
 
 const refreshIcons = () => {
@@ -64,6 +62,9 @@ watch(
 
 /* Frosted glass panel, not solid white */
 .login-overlay :deep(.glass-form) {
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
   background: rgba(232, 245, 238, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.45);
   box-shadow: 0 24px 60px rgba(8, 28, 18, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.5);

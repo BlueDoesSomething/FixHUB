@@ -12,17 +12,17 @@
           <p class="text-sm text-slate-500 mt-1">Login to continue to FIXHUB.</p>
         </div>
         <div>
-          <label class="block text-xs font-bold text-brand-primaryDark/70 mb-2 uppercase tracking-wider">Email Address</label>
+          <label :for="emailId" class="block text-xs font-bold text-brand-primaryDark/70 mb-2 uppercase tracking-wider">Email Address</label>
           <div class="relative">
             <i data-lucide="mail" class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-brand-primary/40"></i>
-            <input v-model="loginForm.email" type="email" placeholder="alex@email.com" class="block w-full pl-11 pr-4 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
+            <input :id="emailId" v-model="loginForm.email" data-testid="login-email" type="email" autocomplete="username" placeholder="Your email address" :aria-invalid="!!loginError" @input="loginError = ''" @keyup.enter="handleLogin" class="block w-full pl-11 pr-4 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
           </div>
         </div>
         <div>
-          <label class="block text-xs font-bold text-brand-primaryDark/70 mb-2 uppercase tracking-wider">Password</label>
+          <label :for="passwordId" class="block text-xs font-bold text-brand-primaryDark/70 mb-2 uppercase tracking-wider">Password</label>
           <div class="relative">
             <i data-lucide="lock" class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-brand-primary/40"></i>
-            <input v-model="loginForm.password" :type="showPassword ? 'text' : 'password'" placeholder="••••••••" class="block w-full pl-11 pr-11 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
+            <input :id="passwordId" v-model="loginForm.password" data-testid="login-password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="Your password" required @keyup.enter="handleLogin" class="block w-full pl-11 pr-11 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
             <button type="button" @click="showPassword = !showPassword" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-primary transition">
               <i :data-lucide="showPassword ? 'eye-off' : 'eye'" class="w-4 h-4"></i>
             </button>
@@ -34,8 +34,9 @@
           </label>
           <a href="#" class="text-brand-primary hover:text-brand-primaryDark transition font-medium">Forgot Password?</a>
         </div>
-        <button @click="handleLogin" class="w-full py-4 rounded-xl bg-brand-primary text-white font-bold text-sm hover:bg-brand-primaryDark transition-all flex items-center justify-center gap-2 group shadow-lg shadow-brand-primary/20">
-          Login & Continue
+        <p v-if="loginError" role="alert" class="text-sm text-red-700">{{ loginError }}</p>
+        <button type="button" :disabled="state.loading" @click="handleLogin" class="w-full py-4 rounded-xl bg-brand-primary text-white font-bold text-sm hover:bg-brand-primaryDark transition-all flex items-center justify-center gap-2 group shadow-lg shadow-brand-primary/20">
+          {{ state.loading ? 'Signing in…' : 'Login & Continue' }}
           <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
         </button>
         <div class="relative my-4">
@@ -57,14 +58,14 @@
           <label class="block text-xs font-bold text-brand-primaryDark/70 mb-2 uppercase tracking-wider">Full Name</label>
           <div class="relative">
             <i data-lucide="user" class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-brand-primary/40"></i>
-            <input v-model="signUpForm.name" type="text" placeholder="Juan Dela Cruz" class="block w-full pl-11 pr-4 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
+            <input v-model="signUpForm.name" type="text" placeholder="Your full name" class="block w-full pl-11 pr-4 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
           </div>
         </div>
         <div>
           <label class="block text-xs font-bold text-brand-primaryDark/70 mb-2 uppercase tracking-wider">Email Address</label>
           <div class="relative">
             <i data-lucide="mail" class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-brand-primary/40"></i>
-            <input v-model="signUpForm.email" type="email" placeholder="juan@email.com" class="block w-full pl-11 pr-4 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
+            <input v-model="signUpForm.email" type="email" placeholder="Your email address" class="block w-full pl-11 pr-4 py-3.5 rounded-xl text-sm placeholder-slate-400 bg-white/70 border border-brand-primary/10 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition text-brand-primaryDark">
           </div>
         </div>
         <div>
@@ -77,7 +78,8 @@
             </button>
           </div>
         </div>
-        <button @click="handleSignUp" class="w-full py-4 rounded-xl bg-brand-accent text-white font-bold text-sm hover:bg-brand-accentHover transition-all flex items-center justify-center gap-2 group shadow-lg shadow-brand-accent/20">
+        <p v-if="loginError" role="alert" class="text-sm text-red-700">{{ loginError }}</p>
+        <button :disabled="state.loading" @click="handleSignUp" class="w-full py-4 rounded-xl bg-brand-accent text-white font-bold text-sm hover:bg-brand-accentHover transition-all flex items-center justify-center gap-2 group shadow-lg shadow-brand-accent/20">
           Create Account
           <i data-lucide="user-plus" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
         </button>
@@ -88,30 +90,61 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, useId } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../../../stores/auth'
 
 const router = useRouter()
-const { login } = useAuth()
+const { loginWithEmail, signUp, state } = useAuth()
 
-const props = withDefaults(defineProps<{ redirect?: string }>(), { redirect: '/client/home' })
+const props = defineProps<{ redirect?: string }>()
+const id = useId()
+const emailId = `${id}-login-email`
+const passwordId = `${id}-login-password`
 
 const isSignUp = ref(false)
 const showPassword = ref(false)
 const loginForm = ref({ email: '', password: '' })
 const signUpForm = ref({ name: '', email: '', password: '' })
+const loginError = ref('')
 
 const handleLogin = () => {
-  if (!loginForm.value.email) { alert('Please enter an email.'); return }
-  login('client')
-  router.push(props.redirect)
+  if (state.loading) return
+  const email = loginForm.value.email.trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    loginError.value = 'Please enter a valid email address.'
+    return
+  }
+  loginError.value = ''
+
+  if (!loginForm.value.password) {
+    loginError.value = 'Enter your password.'
+    return
+  }
+  void loginWithEmail(email, loginForm.value.password)
+    .then(user => router.push(props.redirect || user.homeRoute))
+    .catch(err => { loginError.value = err instanceof Error ? err.message : 'Sign-in failed.' })
 }
 
-const handleSignUp = () => {
-  if (!signUpForm.value.email || !signUpForm.value.name) { alert('Please fill in all fields.'); return }
-  alert('Account created successfully! (Demo)')
-  isSignUp.value = false
+const handleSignUp = async () => {
+  if (state.loading) return
+  if (!signUpForm.value.email || !signUpForm.value.name) {
+    loginError.value = 'Please fill in all fields.'
+    return
+  }
+  if (signUpForm.value.password.length < 12) {
+    loginError.value = 'Password must be at least 12 characters.'
+    return
+  }
+  loginError.value = ''
+
+  try {
+    await signUp(signUpForm.value.name, signUpForm.value.email, signUpForm.value.password)
+    loginError.value = 'Check your email and click the confirmation link to finish creating your account.'
+    isSignUp.value = false
+  } catch (err) {
+    loginError.value = err instanceof Error ? err.message : 'Sign-up failed.'
+  }
 }
 
 let iconTimer: ReturnType<typeof setInterval> | undefined

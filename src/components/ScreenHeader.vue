@@ -44,7 +44,7 @@ withDefaults(
 }
 
 /* Desktop uses the persistent top bar instead */
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .fx-header { display: none; }
 }
 </style>

@@ -21,12 +21,12 @@
       <div v-if="step === 0" class="app-form__grid">
         <div class="fx-field app-form__col">
           <label class="fx-label">Full Name</label>
-          <input v-model="form.fullName" class="fx-input" type="text" placeholder="Juan Dela Cruz" @input="clearErr('fullName')" />
+          <input v-model="form.fullName" class="fx-input" type="text" placeholder="Your full name" @input="clearErr('fullName')" />
           <p v-if="errors.fullName" class="err">{{ errors.fullName }}</p>
         </div>
         <div class="fx-field app-form__col">
           <label class="fx-label">Email Address</label>
-          <input v-model="form.email" class="fx-input" type="email" placeholder="juan@email.com" @input="clearErr('email')" />
+          <input v-model="form.email" class="fx-input" type="email" placeholder="Your email address" @input="clearErr('email')" />
           <p v-if="errors.email" class="err">{{ errors.email }}</p>
         </div>
         <div class="fx-field app-form__col">

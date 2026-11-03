@@ -105,7 +105,7 @@ const props = defineProps<{ application: TechnicianApplication }>();
 const emit = defineEmits<{ edit: []; reapply: [] }>();
 
 const router = useRouter();
-const { login, switchRole } = useAuth();
+const { refreshSession } = useAuth();
 
 const app = computed(() => props.application);
 const meta = computed(() => STATUS_META[props.application.status]);
@@ -129,10 +129,11 @@ const showActions = computed(
     (props.application.status === 'Rejected' && !!props.application.review.allowReapply),
 );
 
-function openDashboard() {
-  login('technician');
-  switchRole('technician');
-  router.push('/technician/dashboard');
+async function openDashboard() {
+  const session = await refreshSession();
+  if (session?.account.role === 'technician' || session?.account.role === 'admin') {
+    router.push('/technician/dashboard');
+  }
 }
 </script>
 

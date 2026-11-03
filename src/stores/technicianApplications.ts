@@ -1,6 +1,5 @@
 import { reactive } from 'vue';
 import {
-  seedApplications,
   type ApplicationStatus,
   type TechnicianApplication,
   type TechnicianApplicationPayload,
@@ -32,14 +31,15 @@ function load(): TechnicianApplication[] {
   if (ls) {
     try {
       const raw = ls.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw) as TechnicianApplication[];
+      if (raw) {
+        const saved = JSON.parse(raw) as TechnicianApplication[];
+        return saved.filter(application => !/^app-demo-/.test(application.id));
+      }
     } catch {
       ls.removeItem(STORAGE_KEY);
     }
   }
-  const seed = seedApplications();
-  save(seed);
-  return seed;
+  return [];
 }
 
 const state = reactive<{ applications: TechnicianApplication[] }>({

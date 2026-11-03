@@ -14,6 +14,7 @@
         <div class="fx-stack">
           <div class="fx-table">
             <h4 class="fx-table__title">Pending Verification</h4>
+            <p v-if="!pending.length" class="fx-page__sub">No verification records available.</p>
             <div v-for="t in pending" :key="t.id" class="fx-table__row">
               <div class="fx-table__avatar" :style="{ background: t.color }">{{ t.initials }}</div>
               <div class="fx-table__info">
@@ -26,14 +27,7 @@
 
           <div class="fx-table">
             <h4 class="fx-table__title">Verified Technicians</h4>
-            <div class="fx-table__row">
-              <div class="fx-table__avatar">JD</div>
-              <div class="fx-table__info">
-                <p class="fx-table__name">Juan Dela Cruz</p>
-                <p class="fx-table__sub">Apple Specialist • 6 yrs exp</p>
-              </div>
-              <span class="fx-pill fx-pill--completed">Verified</span>
-            </div>
+            <p class="fx-page__sub">No technician records available.</p>
           </div>
         </div>
       </div>
@@ -55,10 +49,7 @@ interface PendingTech {
   color: string;
 }
 
-const pending = ref<PendingTech[]>([
-  { id: 1, initials: 'MS', name: 'Mark Santos', specialty: 'Laptop Specialist', experience: '2 yrs exp', color: 'linear-gradient(135deg, #A8E6CF, #56C596)' },
-  { id: 2, initials: 'RC', name: 'Rico Castillo', specialty: 'Android Specialist', experience: '4 yrs exp', color: 'linear-gradient(135deg, #C9B6E4, #8B6FC0)' },
-]);
+const pending = ref<PendingTech[]>([]);
 
 function verify(id: number) {
   pending.value = pending.value.filter((t) => t.id !== id);

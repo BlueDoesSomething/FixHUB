@@ -36,12 +36,8 @@
                 <div class="w-16 h-16 rounded-2xl bg-brand-primary flex items-center justify-center mb-3 shadow-lg">
                   <i data-lucide="smartphone" class="w-8 h-8 text-white"></i>
                 </div>
-                <h4 class="font-bold text-brand-primaryDark text-sm">iPhone 13 Pro</h4>
-                <p class="text-xs text-slate-500 mb-3">Battery Replacement</p>
-                <div class="w-full bg-slate-200 rounded-full h-1.5 mb-2">
-                  <div class="progress-bar h-1.5 rounded-full" style="width: 75%"></div>
-                </div>
-                <p class="text-xs font-bold text-brand-primary">75% Complete</p>
+                <h4 class="font-bold text-brand-primaryDark text-sm">Device Repairs</h4>
+                <p class="text-xs text-slate-500 mb-3">Describe your device issue</p>
               </div>
             </div>
             <div class="app-card p-5 float-img relative">
@@ -51,7 +47,7 @@
               </div>
               <div class="absolute -bottom-3 -left-3 bg-white rounded-xl shadow-lg px-3 py-2 flex items-center gap-2 border border-slate-100 z-10">
                 <div class="w-7 h-7 rounded-full bg-brand-accent/20 flex items-center justify-center"><i data-lucide="star" class="w-4 h-4 text-brand-accent fill-brand-accent"></i></div>
-                <div><p class="text-xs font-bold text-brand-primaryDark leading-tight">4.9 Rating</p><p class="text-[9px] text-slate-500">247 Reviews</p></div>
+                <div><p class="text-xs font-bold text-brand-primaryDark leading-tight">Customer Feedback</p><p class="text-[9px] text-slate-500">Repair reviews</p></div>
               </div>
               <div class="flex flex-col items-center py-4">
                 <div class="w-32 h-32 rounded-full mint-bg flex items-center justify-center">
@@ -73,9 +69,8 @@
                 </div>
                 <div class="relative z-10 flex flex-col items-center py-4">
                   <div class="w-12 h-12 rounded-full bg-brand-accent flex items-center justify-center mb-2 shadow-lg"><i data-lucide="map-pin" class="w-6 h-6 text-white"></i></div>
-                  <h4 class="font-bold text-brand-primaryDark text-sm">Technician Nearby</h4>
-                  <p class="text-xs text-slate-600 mb-3">1.2 km away</p>
-                  <div class="bg-white rounded-lg px-4 py-1.5 shadow-sm"><p class="text-xs font-bold text-brand-primary">ETA: 8 mins</p></div>
+                  <h4 class="font-bold text-brand-primaryDark text-sm">Service Location</h4>
+                  <p class="text-xs text-slate-600 mb-3">Choose your location</p>
                 </div>
               </div>
             </div>

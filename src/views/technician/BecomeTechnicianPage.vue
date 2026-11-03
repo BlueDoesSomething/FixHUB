@@ -40,11 +40,6 @@
             Why Join? <i data-lucide="sparkles" class="w-5 h-5"></i>
           </a>
         </div>
-        <div class="mt-10 grid grid-cols-3 gap-4 max-w-xl mx-auto">
-          <div><div class="text-3xl font-extrabold text-brand-primary">184</div><div class="text-xs text-slate-500 mt-1">Verified Technicians</div></div>
-          <div><div class="text-3xl font-extrabold text-brand-primary">5,291+</div><div class="text-xs text-slate-500 mt-1">Repairs Completed</div></div>
-          <div><div class="text-3xl font-extrabold text-brand-primary">4.9</div><div class="text-xs text-slate-500 mt-1">Average Rating</div></div>
-        </div>
       </header>
 
       <section id="apply" class="max-w-3xl mx-auto px-6 py-12">

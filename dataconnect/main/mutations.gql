@@ -1,0 +1,214 @@
+# There is deliberately no client mutation accepting a role or another user's ID.
+mutation CreateMyProfile($fullName: String!, $phone: String!, $city: String!)
+  @auth(expr: "auth != null && has(auth.token.email) && vars.fullName.size() >= 2 && vars.fullName.size() <= 120 && vars.phone.size() <= 40 && vars.city.size() <= 120") {
+  user_insert(data: {
+    id_expr: "auth.uid"
+    email_expr: "auth.token.email"
+    fullName: $fullName
+    phone: $phone
+    city: $city
+    role: CLIENT
+  })
+}
+
+mutation UpdateMyProfile($fullName: String!, $phone: String!, $city: String!)
+  @auth(expr: "auth != null && vars.fullName.size() >= 2 && vars.fullName.size() <= 120 && vars.phone.size() <= 40 && vars.city.size() <= 120")
+  @transaction {
+  user_update(key: { id_expr: "auth.uid" }, data: {
+    fullName: $fullName
+    phone: $phone
+    city: $city
+    updatedAt_expr: "request.time"
+  }) @check(expr: "this != null", message: "Create your profile first.")
+}
+
+# Document uploads and document verification are a separate, not-yet-implemented
+# stage. These initial application operations store text details only.
+mutation SubmitMyApplication(
+  $fullName: String!
+  $contactNumber: String!
+  $city: String!
+  $yearsExperience: Int!
+  $brands: [String!]!
+  $specializations: [String!]!
+  $experienceDescription: String!
+  $serviceType: ServiceType!
+  $coverageArea: String!
+  $workingDays: [String!]!
+  $workingHours: String!
+)
+  @auth(expr: "auth != null && has(auth.token.email) && vars.fullName.size() >= 2 && vars.fullName.size() <= 120 && vars.contactNumber.size() >= 7 && vars.contactNumber.size() <= 40 && vars.city.size() >= 2 && vars.city.size() <= 120 && vars.yearsExperience >= 0 && vars.yearsExperience <= 100 && vars.brands.size() > 0 && vars.brands.size() <= 20 && vars.brands.all(b, b.size() > 0 && b.size() <= 100) && vars.specializations.size() > 0 && vars.specializations.size() <= 20 && vars.specializations.all(s, s.size() > 0 && s.size() <= 100) && vars.experienceDescription.size() >= 20 && vars.experienceDescription.size() <= 5000 && vars.coverageArea.size() >= 2 && vars.coverageArea.size() <= 500 && vars.workingDays.size() > 0 && vars.workingDays.size() <= 7 && vars.workingDays.all(d, d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']) && vars.workingHours.size() >= 3 && vars.workingHours.size() <= 120")
+  @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" }) {
+      role @check(expr: "this == 'CLIENT'", message: "Only customers can apply.")
+    }
+  }
+  technicianApplication_insert(data: {
+    applicantId_expr: "auth.uid"
+    email_expr: "auth.token.email"
+    fullName: $fullName
+    contactNumber: $contactNumber
+    city: $city
+    yearsExperience: $yearsExperience
+    brands: $brands
+    specializations: $specializations
+    experienceDescription: $experienceDescription
+    serviceType: $serviceType
+    coverageArea: $coverageArea
+    workingDays: $workingDays
+    workingHours: $workingHours
+    status: PENDING
+  })
+  applicationEvent_insert(data: {
+    applicationId_expr: "response.technicianApplication_insert.id"
+    actorId_expr: "auth.uid"
+    status: PENDING
+    note: "Application submitted"
+  })
+}
+
+mutation AdminStartApplicationReview($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" }) {
+      role @check(expr: "this == 'ADMIN'", message: "Administrator access required.")
+    }
+  }
+  technicianApplication_update(
+    first: { where: { id: { eq: $id }, status: { in: [PENDING, NEEDS_INFORMATION] } } }
+    data: {
+      status: UNDER_REVIEW
+      reviewerId_expr: "auth.uid"
+      reviewedAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  ) @check(expr: "this != null", message: "Application cannot enter review from its current status.")
+  applicationEvent_insert(data: {
+    applicationId: $id
+    actorId_expr: "auth.uid"
+    status: UNDER_REVIEW
+    note: "Review started"
+  })
+}
+
+mutation AdminRequestApplicationInformation($id: UUID!, $note: String!)
+  @auth(expr: "auth != null && vars.note.size() >= 5 && vars.note.size() <= 2000")
+  @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" }) {
+      role @check(expr: "this == 'ADMIN'", message: "Administrator access required.")
+    }
+  }
+  technicianApplication_update(
+    first: { where: { id: { eq: $id }, status: { in: [PENDING, UNDER_REVIEW] } } }
+    data: {
+      status: NEEDS_INFORMATION
+      feedback: $note
+      reviewerId_expr: "auth.uid"
+      reviewedAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  ) @check(expr: "this != null", message: "Cannot request information for this application.")
+  applicationEvent_insert(data: {
+    applicationId: $id
+    actorId_expr: "auth.uid"
+    status: NEEDS_INFORMATION
+    note: $note
+  })
+}
+
+mutation AdminRejectApplication($id: UUID!, $note: String!)
+  @auth(expr: "auth != null && vars.note.size() >= 5 && vars.note.size() <= 2000")
+  @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" }) {
+      role @check(expr: "this == 'ADMIN'", message: "Administrator access required.")
+    }
+  }
+  technicianApplication_update(
+    first: { where: { id: { eq: $id }, status: { in: [PENDING, UNDER_REVIEW, NEEDS_INFORMATION] } } }
+    data: {
+      status: REJECTED
+      feedback: $note
+      reviewerId_expr: "auth.uid"
+      reviewedAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  ) @check(expr: "this != null", message: "Cannot reject this application.")
+  applicationEvent_insert(data: {
+    applicationId: $id
+    actorId_expr: "auth.uid"
+    status: REJECTED
+    note: $note
+  })
+}
+
+mutation AdminApproveApplication($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" }) {
+      role @check(expr: "this == 'ADMIN'", message: "Administrator access required.")
+    }
+    technicianApplication(key: { id: $id }) @check {
+      applicantId
+      applicant {
+        role @check(expr: "this == 'CLIENT'", message: "The applicant must still be a customer.")
+      }
+    }
+  }
+  technicianApplication_update(
+    first: { where: { id: { eq: $id }, status: { in: [PENDING, UNDER_REVIEW, NEEDS_INFORMATION] } } }
+    data: {
+      status: APPROVED
+      feedback: null
+      reviewerId_expr: "auth.uid"
+      reviewedAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  ) @check(expr: "this != null", message: "Cannot approve this application.")
+  technicianProfile_insert(data: {
+    userId_expr: "response.query.technicianApplication.applicantId"
+    applicationId: $id
+  })
+  user_update(
+    key: { id_expr: "response.query.technicianApplication.applicantId" }
+    data: { role: TECHNICIAN, updatedAt_expr: "request.time" }
+  )
+  applicationEvent_insert(data: {
+    applicationId: $id
+    actorId_expr: "auth.uid"
+    status: APPROVED
+    note: "Application approved"
+  })
+}
+
+mutation CreateMyRepairRequest(
+  $device: String!
+  $brand: String!
+  $model: String!
+  $problem: String!
+  $serviceType: ServiceType!
+  $location: String!
+)
+  @auth(expr: "auth != null && vars.device.size() >= 2 && vars.device.size() <= 100 && vars.brand.size() >= 1 && vars.brand.size() <= 100 && vars.model.size() >= 1 && vars.model.size() <= 120 && vars.problem.size() >= 5 && vars.problem.size() <= 5000 && vars.serviceType != 'BOTH' && vars.location.size() >= 5 && vars.location.size() <= 500") {
+  repairRequest_insert(data: {
+    customerId_expr: "auth.uid"
+    device: $device
+    brand: $brand
+    model: $model
+    problem: $problem
+    serviceType: $serviceType
+    location: $location
+    status: PENDING
+  })
+}
+
+mutation CancelMyRepairRequest($id: UUID!) @auth(level: USER) @transaction {
+  repairRequest_update(
+    first: { where: {
+      id: { eq: $id }
+      customerId: { eq_expr: "auth.uid" }
+      status: { eq: PENDING }
+    } }
+    data: { status: CANCELLED, updatedAt_expr: "request.time" }
+  ) @check(expr: "this != null", message: "Only your own pending request can be cancelled.")
+}

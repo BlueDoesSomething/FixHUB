@@ -1,0 +1,15 @@
+specVersion: "v1"
+serviceId: "fixhub"
+# Singapore is a starting choice for this Philippines-focused app.
+# Confirm the region before provisioning your real service and database.
+location: "asia-southeast1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "fixhub"
+      cloudSql:
+        instanceId: "fixhub-postgres"
+      schemaValidation: "COMPATIBLE"
+connectorDirs:
+  - "./main"

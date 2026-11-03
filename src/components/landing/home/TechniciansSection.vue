@@ -23,7 +23,8 @@
         </div>
       </div>
 
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <p v-if="!technicians.length" class="text-center text-white/60">No technicians are available to display.</p>
+      <div v-else class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         <TechnicianCard v-for="tech in technicians" :key="tech.id" :tech="tech" />
       </div>
     </div>

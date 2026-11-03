@@ -1,5 +1,11 @@
 # Technician Applications — Backend Specification
 
+> This document is the original **proposed REST design**, not an implemented REST
+> server. The new Firebase SQL Connect / PostgreSQL foundation is documented in
+> [firebase-postgresql-setup.md](firebase-postgresql-setup.md), with its current
+> schema and operations in `dataconnect/`. Supabase is now the chosen backend;
+> see [supabase-setup.md](supabase-setup.md). Application persistence is still browser-local.
+
 Specification for persisting and reviewing **technician applications** behind the
 frontend module (`/become-a-technician` and `/admin/applications`).
 
@@ -282,5 +288,5 @@ Common codes: `validation_error` (422), `invalid_transition` (409),
    reactive `state` and component contracts unchanged.
 2. File uploads: switch the `FileReader` data URLs to `multipart/form-data`
    uploads returning a `storageKey` + signed `downloadUrl`.
-3. The demo `auth.ts` store is in-memory only; real sessions must resolve
+3. The `auth.ts` store uses Supabase sessions; application operations must resolve
    `user_id` server-side before linking an application.

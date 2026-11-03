@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router';
+import { initializeAuth } from './stores/auth';
 
 import { IonicVue } from '@ionic/vue';
 import { createIcons, icons } from 'lucide';
@@ -55,7 +56,9 @@ const app = createApp(App)
   .use(IonicVue)
   .use(router);
 
-router.isReady().then(() => {
+router.isReady().then(async () => {
+  // Restore any existing Supabase session before mounting.
+  await initializeAuth();
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }

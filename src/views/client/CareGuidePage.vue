@@ -164,7 +164,7 @@ import { useRepairDraft } from '../../stores/repair';
 
 const route = useRoute();
 const router = useRouter();
-const { draft } = useRepairDraft();
+const { draft, initialize } = useRepairDraft();
 
 const issue = computed(() => getCareIssue(String(route.params.issueId)));
 const outcome = ref<'none' | 'decide' | 'fixed' | 'unresolved'>('none');
@@ -193,7 +193,8 @@ function restart() {
   outcome.value = 'none';
 }
 
-function bookRepair() {
+async function bookRepair() {
+  await initialize();
   if (issue.value) {
     draft.problem = `${issue.value.title} — self-service troubleshooting did not resolve it.`;
   }

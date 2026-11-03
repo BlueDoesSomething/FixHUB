@@ -9,10 +9,6 @@
               <h1 class="dash-hero__name">{{ profile.name }}</h1>
               <p class="dash-hero__role">Field Technician · FIXHUB</p>
             </div>
-            <div class="avail" :class="{ 'avail--off': !available }" @click="available = !available">
-              <div class="switch" :class="{ off: !available }" />
-              <span>{{ available ? 'Available' : 'Offline' }}</span>
-            </div>
           </div>
         </section>
 
@@ -21,22 +17,22 @@
             <div class="fx-stat__icon fx-stat__icon--blue">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             </div>
-            <p class="fx-stat__value">5</p>
+            <p class="fx-stat__value">—</p>
             <p class="fx-stat__label">Jobs Today</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--orange">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>
             </div>
-            <p class="fx-stat__value">3</p>
+            <p class="fx-stat__value">—</p>
             <p class="fx-stat__label">Pending Requests</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--green">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.6 5.8 21 7 14 2 9.3 9 8.5 12 2" /></svg>
             </div>
-            <p class="fx-stat__value">4.9★</p>
-            <p class="fx-stat__label">Avg. Rating</p>
+            <p class="fx-stat__value">{{ reviewSummary.average?.toFixed(1) ?? '—' }}★</p>
+            <p class="fx-stat__label">Avg. Rating · {{ reviewSummary.total }} reviews</p>
           </div>
         </div>
 
@@ -44,22 +40,7 @@
           <div>
             <h3 class="fx-section-title fx-section-title--lg">Incoming Requests</h3>
             <div class="fx-table">
-              <div class="fx-table__row">
-                <InitialAvatar initials="AR" gradient="linear-gradient(135deg, #146344, #1b7a54)" :size="42" />
-                <div class="fx-table__info">
-                  <p class="fx-table__name">Alex Rivera</p>
-                  <p class="fx-table__sub">iPhone 13 · Not charging · 1.2 km</p>
-                </div>
-                <span class="fx-pill fx-pill--progress">🏠 Home</span>
-              </div>
-              <div class="fx-table__row">
-                <InitialAvatar initials="MS" gradient="linear-gradient(135deg, #A8E6CF, #56C596)" :size="42" />
-                <div class="fx-table__info">
-                  <p class="fx-table__name">Maria Santos</p>
-                  <p class="fx-table__sub">MacBook Air M1 · Keyboard issue · 3.5 km</p>
-                </div>
-                <span class="fx-pill fx-pill--accent">📦 Drop-off</span>
-              </div>
+              <p class="fx-page__sub">No incoming requests available.</p>
             </div>
             <button class="fx-btn fx-btn-primary requests-cta" @click="router.push('/technician/requests')">View All Requests</button>
           </div>
@@ -67,27 +48,10 @@
           <aside>
             <h3 class="fx-section-title fx-section-title--lg">Quick Actions</h3>
             <button class="fx-btn fx-btn-primary fx-btn--block" @click="router.push('/technician/requests')">View New Requests</button>
-            <button class="fx-btn fx-btn-secondary fx-btn--block action-secondary" @click="available = !available">
-              {{ available ? 'Go Offline' : 'Go Available' }}
-            </button>
+            <button class="fx-btn fx-btn-secondary fx-btn--block action-secondary" @click="router.push('/technician/reviews')">Customer Reviews</button>
 
             <h3 class="fx-section-title fx-section-title--lg recent-title">Recent Activity</h3>
-            <div class="fx-card activity">
-              <div class="activity__top">
-                <div class="activity__user">
-                  <InitialAvatar initials="MS" gradient="linear-gradient(135deg, #A8E6CF, #56C596)" :size="42" />
-                  <div>
-                    <h4>Maria Santos</h4>
-                    <p>Completed • 2 hrs ago</p>
-                  </div>
-                </div>
-                <span class="fx-pill fx-pill--accent">📦 Drop-off</span>
-              </div>
-              <div class="activity__details">
-                <div><span>Device:</span><strong>MacBook Air M1</strong></div>
-                <div><span>Problem:</span><strong>Keyboard issue</strong></div>
-              </div>
-            </div>
+            <div class="fx-card"><p class="fx-page__sub">No recent activity available.</p></div>
           </aside>
         </div>
       </div>
@@ -96,16 +60,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
-import InitialAvatar from '../../components/InitialAvatar.vue';
 import { useAuth } from '../../stores/auth';
+import { technicians } from '../../data/catalog';
+import { useReviews } from '../../stores/reviews';
 
 const router = useRouter();
 const { profile: getProfile } = useAuth();
-const profile = getProfile();
-const available = ref(true);
+const profile = computed(getProfile);
+const { summary } = useReviews();
+const reviewSummary = computed(() => summary(technicians.find(tech => tech.name === profile.value.name)?.id ?? -1));
 </script>
 
 <style scoped>

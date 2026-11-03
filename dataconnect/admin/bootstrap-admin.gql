@@ -1,0 +1,9 @@
+# Privileged, manual operation. This directory is NOT in connectorDirs and is
+# never exposed through the web SDK. Run only as a project owner via VS Code.
+# First create a Firebase Auth account and its User profile, then supply its UID.
+mutation BootstrapAdmin($uid: String!) @auth(level: NO_ACCESS) @transaction {
+  user_update(key: { id: $uid }, data: {
+    role: ADMIN
+    updatedAt_expr: "request.time"
+  }) @check(expr: "this != null", message: "Create the user profile before granting admin access.")
+}

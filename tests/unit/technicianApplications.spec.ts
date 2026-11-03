@@ -36,10 +36,10 @@ describe('technicianApplications store', () => {
     vi.resetModules();
   });
 
-  test('seeds demo applications when storage is empty', async () => {
+  test('starts without applications when storage is empty', async () => {
     const { useTechnicianApplications } = await import('@/stores/technicianApplications');
     const store = useTechnicianApplications();
-    expect(store.all().length).toBeGreaterThan(0);
+    expect(store.all()).toEqual([]);
   });
 
   test('submitting a new application stores it as Pending and links it to the user', async () => {

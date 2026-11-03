@@ -4,9 +4,8 @@
       <div class="fx-page">
         <section class="fx-hero">
           <div class="fx-hero-body matching-hero">
-            <div class="spinner" />
-            <h3 class="matching-hero__title">{{ loading ? 'Finding best technician...' : 'Technicians matched!' }}</h3>
-            <p class="matching-hero__sub">Analyzing skills &amp; distance</p>
+            <h3 class="matching-hero__title">Find a Technician</h3>
+            <p class="matching-hero__sub">Browse available repair professionals.</p>
             <div class="factors">
               <span>📍 Distance</span>
               <span>🔧 Skills</span>
@@ -17,6 +16,7 @@
         </section>
 
         <h3 class="fx-section-title fx-section-title--lg">Recommended</h3>
+        <p v-if="!technicians.length" class="fx-card">No technicians are available to display.</p>
         <div class="fx-grid-2">
           <TechnicianCard
             v-for="tech in technicians"
@@ -31,16 +31,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import TechnicianCard from '../../components/TechnicianCard.vue';
-import { technicians, type Technician } from '../../data/mock';
+import { technicians, type Technician } from '../../data/catalog';
 
 const router = useRouter();
-const loading = ref(true);
-
-onMounted(() => setTimeout(() => (loading.value = false), 1600));
 
 function openProfile(tech: Technician) {
   router.push({ path: '/client/request/technician', query: { id: String(tech.id) } });

@@ -7,9 +7,38 @@ ion-content {
   --background: var(--bg);
 }
 
+/* One viewport-sized shell keeps Ionic's bottom menu outside the page scroller. */
+.app-shell {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+.app-shell__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.app-shell__body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+.app-shell__body ion-tabs { position: relative; flex: 1; height: auto; min-height: 0; }
+
 /* ---- Page container ---- */
 .fx-page {
   width: 100%;
+  min-width: 0;
   max-width: 1200px;
   margin: 0 auto;
   padding: 28px 32px 56px;
@@ -24,6 +53,7 @@ ion-content {
   flex-wrap: wrap;
   margin-bottom: 24px;
 }
+.fx-page__head > div { min-width: 0; }
 .fx-page__title {
   font-size: 26px;
   font-weight: 800;
@@ -48,6 +78,7 @@ ion-content {
 
 /* ---- Cards ---- */
 .fx-card {
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: 16px;
@@ -115,6 +146,7 @@ ion-content {
   gap: 16px;
 }
 .fx-stat {
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: 16px;
@@ -136,10 +168,11 @@ ion-content {
 .fx-stat__icon--orange { background: var(--accent); }
 .fx-stat__icon--green { background: var(--success); }
 .fx-stat__value { font-size: 26px; font-weight: 800; color: var(--text-dark); margin: 0; letter-spacing: -0.5px; }
-.fx-stat__label { font-size: 13px; color: var(--text-muted); margin: 4px 0 0; }
+.fx-stat__label { font-size: 13px; color: var(--text-muted); margin: 4px 0 0; overflow-wrap: anywhere; }
 
 /* ---- Tables ---- */
 .fx-table {
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: 16px;
@@ -180,8 +213,8 @@ ion-content {
   flex-shrink: 0;
 }
 .fx-table__info { flex: 1; min-width: 0; }
-.fx-table__name { font-size: 14px; font-weight: 700; color: var(--text-dark); margin: 0; }
-.fx-table__sub { font-size: 12px; color: var(--text-muted); margin: 2px 0 0; }
+.fx-table__name { font-size: 14px; font-weight: 700; color: var(--text-dark); margin: 0; overflow-wrap: anywhere; }
+.fx-table__sub { font-size: 12px; color: var(--text-muted); margin: 2px 0 0; overflow-wrap: anywhere; }
 
 /* ---- Forms ---- */
 .fx-field { margin-bottom: 16px; }
@@ -206,12 +239,13 @@ ion-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 10px 0;
   border-bottom: 1px solid var(--hairline);
 }
 .fx-info-row:last-child { border-bottom: none; }
 .fx-info-label { font-size: 13px; color: var(--text-muted); }
-.fx-info-value { font-size: 14px; font-weight: 600; color: var(--text-dark); }
+.fx-info-value { min-width: 0; text-align: right; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--text-dark); }
 
 /* ---- Hero banner ---- */
 .fx-hero {
@@ -239,9 +273,10 @@ ion-content {
 .fx-hero-body { position: relative; z-index: 1; }
 
 /* ---- Layout helpers ---- */
-.fx-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-.fx-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.fx-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; }
+.fx-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px; }
 .fx-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
+.fx-grid-2 > *, .fx-grid-3 > *, .fx-split > * { min-width: 0; }
 
 .fx-avatar {
   display: flex;
@@ -311,13 +346,46 @@ ion-content {
 .fx-topbar__dot { position: absolute; top: 8px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; }
 
 /* ---- Responsive ---- */
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .fx-topbar { display: flex; }
 }
 
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .fx-topbar { padding-inline: 24px; }
+  .fx-topbar__search { width: 180px; }
+  .fx-topbar__title { font-size: 17px; }
+  .fx-topbar__right { gap: 10px; }
+}
+
+@media (max-width: 1199px) {
+  .fx-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 1023px) {
+  .app-shell { flex-direction: column; }
+  .fx-page { padding: 24px 24px 32px; }
+  .fx-btn { min-height: 44px; }
+  .fx-page input:not([type="checkbox"]):not([type="radio"]), .fx-page textarea, .fx-page select { min-width: 0; font-size: 16px; }
+}
+
 @media (max-width: 767px) {
-  .fx-page { padding: 18px 16px 40px; }
+  .fx-page { padding: 18px 16px 32px; }
   .fx-page__title { font-size: 22px; }
-  .fx-split { grid-template-columns: 1fr; }
-  .fx-stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .fx-page__sub { line-height: 1.7; }
+  .fx-page__head { align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+  .fx-hero { padding: 22px; border-radius: 18px; }
+  .fx-card { padding: 16px; }
+  .fx-card--flush { padding: 0; }
+  .fx-table { padding: 4px 16px; }
+  .fx-table__title { gap: 12px; flex-wrap: wrap; }
+  .fx-table__row { flex-wrap: wrap; gap: 10px; }
+  .fx-table__info { flex: 1 1 140px; }
+  .fx-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .fx-stat { padding: 16px; }
+  .fx-stat__value { font-size: clamp(20px, 5.5vw, 26px); }
+  .fx-info-row { align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .fx-btn, .app-shell .fx-card--interactive { transition: none; }
 }

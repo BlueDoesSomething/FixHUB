@@ -7,9 +7,9 @@
         <h4>{{ tech.name }}</h4>
         <p class="tech-card__spec">{{ tech.specialty }}</p>
         <div class="tech-card__rating">
-          <span class="stars">★★★★★</span>
-          <span>{{ tech.rating }}</span>
-          <span class="tech-card__reviews">({{ tech.reviews }})</span>
+          <span class="stars" aria-hidden="true">★</span>
+          <span>{{ reviewSummary.average?.toFixed(1) ?? '—' }}</span>
+          <span class="tech-card__reviews">({{ reviewSummary.total }} reviews)</span>
         </div>
       </div>
     </div>
@@ -24,11 +24,14 @@
 
 <script setup lang="ts">
 import InitialAvatar from './InitialAvatar.vue';
-import type { Technician } from '../data/mock';
+import { computed } from 'vue';
+import type { Technician } from '../data/catalog';
+import { useReviews } from '../stores/reviews';
 
 const props = defineProps<{ tech: Technician }>();
 const emit = defineEmits<{ select: [tech: Technician] }>();
-void props;
+const { summary } = useReviews();
+const reviewSummary = computed(() => summary(props.tech.id));
 </script>
 
 <style scoped>

@@ -4,6 +4,7 @@ node_modules
 /dist
 /ios
 /android
+/src/dataconnect-generated/
 
 
 # local env files

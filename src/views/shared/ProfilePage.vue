@@ -20,6 +20,11 @@
             </div>
 
             <div class="fx-card menu-card">
+              <button v-if="reviewsRoute" type="button" class="menu-item reviews-link" @click="router.push(reviewsRoute)">
+                <span class="menu-icon" aria-hidden="true">★</span>
+                <span class="menu-text">{{ route.path.startsWith('/technician') ? 'Customer Reviews' : 'My Reviews' }}</span>
+                <span class="menu-arrow" aria-hidden="true">›</span>
+              </button>
               <div class="menu-item">
                 <div class="menu-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07" /></svg>
@@ -54,14 +59,17 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import InitialAvatar from '../../components/InitialAvatar.vue';
 import { useAuth } from '../../stores/auth';
 
 const router = useRouter();
+const route = useRoute();
+const reviewsRoute = computed(() => route.path.startsWith('/technician') ? '/technician/reviews' : route.path.startsWith('/client') ? '/client/reviews' : '');
 const { profile: getProfile, logout } = useAuth();
-const profile = getProfile();
+const profile = computed(getProfile);
 
 function onLogout() {
   logout();
@@ -82,6 +90,8 @@ function onLogout() {
   cursor: pointer; border-bottom: 1px solid var(--hairline);
 }
 .menu-item:last-child { border-bottom: none; }
+.reviews-link { width: 100%; border: none; border-bottom: 1px solid var(--hairline); background: transparent; text-align: left; font: inherit; }
+.reviews-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .menu-icon {
   width: 38px; height: 38px; background: var(--gradient-soft); border-radius: 10px;
   display: flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0;

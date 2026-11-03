@@ -19,7 +19,7 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
               </svg>
-              Request a Repair
+              {{ hasDraft ? 'Continue Repair Draft' : 'Request a Repair' }}
             </button>
           </div>
         </section>
@@ -29,52 +29,37 @@
             <div class="fx-stat__icon fx-stat__icon--blue">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             </div>
-            <p class="fx-stat__value">2</p>
-            <p class="fx-stat__label">Active Repairs</p>
+            <p class="fx-stat__value">{{ repairState.requests.length }}</p>
+            <p class="fx-stat__label">Requests Saved Locally</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--green">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
-            <p class="fx-stat__value">12</p>
-            <p class="fx-stat__label">Completed</p>
+            <p class="fx-stat__value">{{ repairState.requests.length }}</p>
+            <p class="fx-stat__label">Pending · Local Only</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--orange">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.6 5.8 21 7 14 2 9.3 9 8.5 12 2" /></svg>
             </div>
-            <p class="fx-stat__value">4.9</p>
-            <p class="fx-stat__label">Avg. Rating</p>
+            <p class="fx-stat__value">{{ photoCount }}</p>
+            <p class="fx-stat__label">Photos Attached</p>
           </div>
         </div>
 
+        <section class="saved-requests">
+          <h2 class="fx-section-title fx-section-title--lg">Your submitted requests</h2>
+          <RepairSaveStatus />
+          <LocalRepairRequests v-if="repairState.requests.length" :requests="repairState.requests.slice(0, 3)" />
+          <p v-else class="saved-requests__empty">No local requests submitted yet. Start a repair request to save one here.</p>
+        </section>
+
         <div class="fx-split">
           <div>
-            <h3 class="fx-section-title fx-section-title--lg">Active Repair</h3>
-            <div class="fx-card active-card" @click="router.push('/client/home/status')">
-              <div class="active-card__head">
-                <div>
-                  <span class="fx-pill fx-pill--progress">In Progress</span>
-                  <div class="active-card__device">iPhone 13</div>
-                  <div class="active-card__status">Battery replacement · Repair in progress</div>
-                </div>
-                <span class="active-card__view">View details</span>
-              </div>
-              <div class="active-card__bar"><span /></div>
-              <div class="active-card__foot">
-                <div class="active-card__tech">
-                  <InitialAvatar initials="JD" gradient="linear-gradient(135deg, #A8E6CF, #56C596)" :size="34" />
-                  <div>
-                    <p class="active-card__tech-name">Juan Dela Cruz</p>
-                    <p class="active-card__tech-sub">Your technician · ETA 8 min</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <h3 class="fx-section-title fx-section-title--lg" style="margin-top: 28px">Device Categories</h3>
             <div class="fx-grid-3">
-              <button v-for="c in categories" :key="c.name" class="fx-card fx-card--sm fx-card--interactive category" @click="router.push('/client/request')">
+              <button v-for="c in categories" :key="c.name" class="fx-card fx-card--sm fx-card--interactive category" @click="startRequest(c.name)">
                 <span class="category__icon" v-html="c.icon" />
                 <span class="category__name">{{ c.name }}</span>
               </button>
@@ -95,7 +80,7 @@
 
             <h3 class="fx-section-title fx-section-title--lg">Service Types</h3>
             <div class="services">
-              <div class="fx-card fx-card--interactive service-tile" @click="router.push('/client/request')">
+              <div class="fx-card fx-card--interactive service-tile" @click="startRequest(undefined, 'home')">
                 <div class="service-tile__icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
                 </div>
@@ -104,7 +89,7 @@
                   <p class="service-tile__desc">Verified technicians come to you</p>
                 </div>
               </div>
-              <div class="fx-card fx-card--interactive service-tile" @click="router.push('/client/request')">
+              <div class="fx-card fx-card--interactive service-tile" @click="startRequest(undefined, 'dropoff')">
                 <div class="service-tile__icon service-tile__icon--amber">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M3 9h18" /></svg>
                 </div>
@@ -122,17 +107,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonPage, IonContent } from '@ionic/vue';
-import InitialAvatar from '../../components/InitialAvatar.vue';
+import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { useAuth } from '../../stores/auth';
-import { categories } from '../../data/mock';
+import { categories } from '../../data/catalog';
+import RepairSaveStatus from '../../components/repair/RepairSaveStatus.vue';
+import LocalRepairRequests from '../../components/repair/LocalRepairRequests.vue';
+import { useRepairDraft } from '../../stores/repair';
+import type { ServiceType } from '../../data/repair';
 
 const router = useRouter();
 const { profile: getProfile } = useAuth();
-const profile = getProfile();
-const firstName = computed(() => profile.name.split(' ')[0]);
+const firstName = computed(() => getProfile().name.split(' ')[0]);
+const { draft, state: repairState, initialize } = useRepairDraft();
+const hasDraft = computed(() => !!(draft.brand || draft.model || draft.problem || draft.photos.length));
+const photoCount = computed(() => repairState.requests.reduce((total, request) => total + request.photos.length, 0));
+async function startRequest(device?: string, service?: ServiceType) {
+  await initialize();
+  if (device) draft.device = device;
+  if (service) draft.serviceType = service;
+  router.push('/client/request');
+}
+onMounted(initialize);
+onIonViewWillEnter(initialize);
 </script>
 
 <style scoped>
@@ -151,6 +149,8 @@ const firstName = computed(() => profile.name.split(' ')[0]);
 .hero__cta { flex-shrink: 0; }
 
 .intro-stats { margin: 24px 0 32px; }
+.saved-requests { margin-bottom: 32px; }
+.saved-requests__empty { font-size: 13px; color: var(--text-muted); }
 
 .active-card { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
 .active-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }

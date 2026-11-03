@@ -125,9 +125,9 @@ onUnmounted(() => {
 .apps__stats { margin-bottom: 22px; }
 .fx-stat__icon :deep(svg) { width: 18px; height: 18px; }
 .apps__toolbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.apps__search { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 14px; min-width: 280px; flex: 1; max-width: 420px; }
+.apps__search { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 14px; min-width: min(280px, 100%); flex: 1; max-width: 420px; }
 .apps__search-ico { width: 16px; height: 16px; color: var(--text-muted); }
-.apps__search input { border: none; outline: none; background: transparent; font-family: inherit; font-size: 14px; width: 100%; color: var(--text-dark); }
+.apps__search input { min-width: 0; border: none; outline: none; background: transparent; font-family: inherit; font-size: 14px; width: 100%; color: var(--text-dark); }
 .apps__filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--hairline); background: #fff; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-dark); cursor: pointer; transition: all 0.15s ease; }
 .chip:hover { border-color: rgba(20, 99, 68, 0.35); }

@@ -25,8 +25,36 @@ npm-debug.log*
 /.vscode/*
 !/.vscode/extensions.json
 /coverage
+/tests/e2e/screenshots/
+/tests/e2e/videos/
+/tests/e2e/downloads/
+/cypress/downloads/
 /dist
 /node_modules
 /platforms
 /plugins
 /www
+
+# Android credentials and build output
+*.jks
+*.keystore
+key.properties
+keystore.properties
+*.apk
+*.aab
+
+# Firebase local state and private configuration
+/.firebase/
+/dataconnect/.dataconnect/
+.env
+.env.*
+!.env.example
+*service-account*.json
+*serviceAccount*.json
+
+# Supabase CLI state (can contain linked-project connection information)
+/supabase/.temp/
+/supabase/.branches/
+
+# Local-only originals containing private test credentials
+/.local-private/

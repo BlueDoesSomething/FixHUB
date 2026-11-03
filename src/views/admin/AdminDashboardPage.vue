@@ -7,9 +7,9 @@
             <div>
               <p class="hero__eyebrow">Admin Control Center</p>
               <h1 class="hero__title">Admin Dashboard</h1>
-              <p class="hero__sub">Friday, Oct 9, 2026 · FIXHUB network at a glance</p>
+              <p class="hero__sub">FIXHUB network at a glance</p>
             </div>
-            <InitialAvatar initials="AD" gradient="linear-gradient(135deg, #146344, #56C596)" :size="56" />
+            <InitialAvatar :initials="profile.initials" :gradient="profile.color" :size="56" />
           </div>
         </section>
 
@@ -18,28 +18,28 @@
             <div class="fx-stat__icon fx-stat__icon--blue">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
             </div>
-            <p class="fx-stat__value">2,847</p>
+            <p class="fx-stat__value">—</p>
             <p class="fx-stat__label">Total Users</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--teal">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6" /></svg>
             </div>
-            <p class="fx-stat__value">184</p>
+            <p class="fx-stat__value">—</p>
             <p class="fx-stat__label">Technicians</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--orange">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             </div>
-            <p class="fx-stat__value">47</p>
+            <p class="fx-stat__value">—</p>
             <p class="fx-stat__label">Active Repairs</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--green">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
-            <p class="fx-stat__value">5,291</p>
+            <p class="fx-stat__value">—</p>
             <p class="fx-stat__label">Completed</p>
           </div>
           <div class="fx-stat">
@@ -51,24 +51,17 @@
           </div>
         </div>
 
+        <TopTechnicians class="dashboard__section" />
+
         <div class="fx-grid-2 dashboard__section">
           <div class="fx-card">
-            <h4 class="chart-title">Weekly Repairs <span>+12%</span></h4>
-            <BarChart :data="weeklyRepairs" :chart-height="180" />
+            <h4 class="chart-title">Weekly Repairs</h4>
+            <p class="apps-empty">No repair activity available.</p>
           </div>
 
           <div class="fx-table">
-            <h4 class="fx-table__title">Recent Requests <span class="see-all">View All</span></h4>
-            <div class="fx-table__row">
-              <div class="fx-table__avatar">AR</div>
-              <div class="fx-table__info"><p class="fx-table__name">Alex Rivera</p><p class="fx-table__sub">iPhone 13 • Home</p></div>
-              <span class="fx-pill fx-pill--progress">Active</span>
-            </div>
-            <div class="fx-table__row">
-              <div class="fx-table__avatar" style="background: linear-gradient(135deg, #A8E6CF, #56C596)">MS</div>
-              <div class="fx-table__info"><p class="fx-table__name">Maria Santos</p><p class="fx-table__sub">MacBook Air • Drop-off</p></div>
-              <span class="fx-pill fx-pill--pending">Pending</span>
-            </div>
+            <h4 class="fx-table__title">Recent Requests</h4>
+            <p class="apps-empty">No requests available.</p>
           </div>
         </div>
 
@@ -95,13 +88,14 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import InitialAvatar from '../../components/InitialAvatar.vue';
-import BarChart from '../../components/BarChart.vue';
-import { weeklyRepairs } from '../../data/mock';
+import TopTechnicians from '../../components/admin/TopTechnicians.vue';
 import { STATUS_META, initialsOf } from '../../data/technicianApplication';
 import { useTechnicianApplications } from '../../stores/technicianApplications';
+import { useAuth } from '../../stores/auth';
 
 const router = useRouter();
 const applications = useTechnicianApplications();
+const profile = computed(() => useAuth().profile());
 
 const pendingApps = computed(() =>
   applications
@@ -116,6 +110,7 @@ const pendingCount = computed(
 
 <style scoped>
 .hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.hero > div:first-child { flex: 1; min-width: 0; }
 .hero__eyebrow { font-size: 14px; opacity: 0.85; margin: 0 0 4px; }
 .hero__title { font-size: 30px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
 .hero__sub { font-size: 15px; opacity: 0.85; margin: 6px 0 0; }
@@ -129,6 +124,8 @@ const pendingCount = computed(
 .chart-title span { color: var(--success); font-size: 13px; font-weight: 700; }
 
 @media (max-width: 767px) {
+  .hero { gap: 16px; align-items: flex-start; }
   .hero__title { font-size: 24px; }
+  .hero__sub { font-size: 13px; line-height: 1.7; }
 }
 </style>

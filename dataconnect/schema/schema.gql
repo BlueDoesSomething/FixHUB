@@ -1,0 +1,93 @@
+# Firebase SQL Connect maps these types to PostgreSQL tables.
+# User IDs always refer to Firebase Authentication UIDs, never email addresses.
+enum UserRole {
+  CLIENT
+  TECHNICIAN
+  ADMIN
+}
+
+enum ApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  NEEDS_INFORMATION
+  APPROVED
+  REJECTED
+}
+
+enum ServiceType {
+  HOME
+  DROPOFF
+  BOTH
+}
+
+enum RepairStatus {
+  PENDING
+  ACCEPTED
+  EN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+type User @table(name: "users") {
+  id: String! @default(expr: "auth.uid")
+  fullName: String! @col(dataType: "varchar(120)")
+  email: String!
+  phone: String! @default(value: "")
+  city: String! @default(value: "")
+  role: UserRole! @default(value: CLIENT)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+# One application per account. Rejected applications are edited and resubmitted.
+type TechnicianApplication @table(name: "technician_applications") {
+  applicant: User! @unique
+  fullName: String!
+  email: String!
+  contactNumber: String!
+  city: String!
+  yearsExperience: Int!
+  brands: [String!]!
+  specializations: [String!]!
+  experienceDescription: String!
+  serviceType: ServiceType!
+  coverageArea: String!
+  workingDays: [String!]!
+  workingHours: String!
+  status: ApplicationStatus! @default(value: PENDING)
+  feedback: String
+  reviewer: User
+  reviewedAt: Timestamp
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type ApplicationEvent @table(name: "technician_application_events") {
+  application: TechnicianApplication!
+  actor: User!
+  status: ApplicationStatus!
+  note: String
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type TechnicianProfile @table(name: "technicians", key: "user") {
+  user: User!
+  application: TechnicianApplication! @unique
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type RepairRequest @table(name: "repair_requests") {
+  customer: User!
+  device: String!
+  brand: String!
+  model: String!
+  problem: String!
+  serviceType: ServiceType!
+  location: String!
+  status: RepairStatus! @default(value: PENDING)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
