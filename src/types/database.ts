@@ -328,6 +328,39 @@ export type Database = {
         }
         Relationships: []
       }
+      technician_locations: {
+        Row: {
+          technician_id: string
+          latitude: number
+          longitude: number
+          address: string
+          is_shared: boolean
+          updated_at: string
+        }
+        Insert: {
+          technician_id: string
+          latitude: number
+          longitude: number
+          address: string
+          is_shared?: boolean
+          updated_at?: string
+        }
+        Update: {
+          technician_id?: string
+          latitude?: number
+          longitude?: number
+          address?: string
+          is_shared?: boolean
+          updated_at?: string
+        }
+        Relationships: [{
+          foreignKeyName: "technician_locations_technician_id_fkey"
+          columns: ["technician_id"]
+          isOneToOne: true
+          referencedRelation: "technician_profiles"
+          referencedColumns: ["id"]
+        }]
+      }
       technician_profiles: {
         Row: {
           application_id: string
@@ -437,6 +470,28 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
           user_id: string
+        }[]
+      }
+      get_my_technician_location: {
+        Args: never
+        Returns: Database["public"]["Tables"]["technician_locations"]["Row"][]
+      }
+      save_my_technician_location: {
+        Args: { p_latitude: number; p_longitude: number; p_address: string }
+        Returns: Database["public"]["Tables"]["technician_locations"]["Row"][]
+      }
+      stop_sharing_my_technician_location: { Args: never; Returns: undefined }
+      list_located_technicians: {
+        Args: never
+        Returns: {
+          id: string
+          full_name: string
+          specializations: string[]
+          service_type: Database["public"]["Enums"]["service_type"]
+          latitude: number
+          longitude: number
+          address: string
+          updated_at: string
         }[]
       }
       is_admin: { Args: never; Returns: boolean }

@@ -16,7 +16,7 @@
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
-    "test:supabase:sql": "node --test tests/supabase/database.test.mjs",
+    "test:supabase:sql": "node --test tests/supabase/*.test.mjs",
     "backend:generate": "firebase dataconnect:sdk:generate --project demo-fixhub",
     "backend:emulators": "firebase emulators:start --only auth,dataconnect --project demo-fixhub",
     "test:backend": "firebase emulators:exec --only auth,dataconnect --project demo-fixhub \"node --test --test-force-exit tests/backend/backend.test.mjs\"",

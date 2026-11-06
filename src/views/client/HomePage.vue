@@ -48,6 +48,11 @@
           </div>
         </div>
 
+        <section class="fx-card nearby-callout">
+          <div><h2 class="fx-section-title">Find a nearby technician</h2><p class="fx-page__sub">Search by address or GPS and view shared service locations on the map.</p></div>
+          <button class="fx-btn fx-btn-secondary" type="button" @click="router.push('/client/request/matching')">Find Technicians</button>
+        </section>
+
         <section class="saved-requests">
           <h2 class="fx-section-title fx-section-title--lg">Your submitted requests</h2>
           <RepairSaveStatus />
@@ -150,6 +155,7 @@ onIonViewWillEnter(initialize);
 
 .intro-stats { margin: 24px 0 32px; }
 .saved-requests { margin-bottom: 32px; }
+.nearby-callout { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
 .saved-requests__empty { font-size: 13px; color: var(--text-muted); }
 
 .active-card { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }

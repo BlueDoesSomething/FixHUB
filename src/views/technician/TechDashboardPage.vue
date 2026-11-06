@@ -36,6 +36,8 @@
           </div>
         </div>
 
+        <TechnicianLocationCard v-if="authState.session" :key="authState.session.userId" ref="locationCard" />
+
         <div class="fx-split dash-split">
           <div>
             <h3 class="fx-section-title fx-section-title--lg">Incoming Requests</h3>
@@ -60,18 +62,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonPage, IonContent } from '@ionic/vue';
+import { IonPage, IonContent, onIonViewWillEnter, onIonViewDidEnter, onIonViewDidLeave } from '@ionic/vue';
 import { useAuth } from '../../stores/auth';
 import { technicians } from '../../data/catalog';
 import { useReviews } from '../../stores/reviews';
+import TechnicianLocationCard from '../../components/technician/TechnicianLocationCard.vue';
 
 const router = useRouter();
-const { profile: getProfile } = useAuth();
+const { profile: getProfile, state: authState } = useAuth();
+const locationCard = ref<InstanceType<typeof TechnicianLocationCard> | null>(null);
 const profile = computed(getProfile);
 const { summary } = useReviews();
 const reviewSummary = computed(() => summary(technicians.find(tech => tech.name === profile.value.name)?.id ?? -1));
+onIonViewWillEnter(() => locationCard.value?.refresh());
+onIonViewDidEnter(() => locationCard.value?.resize());
+onIonViewDidLeave(() => locationCard.value?.cancelPending());
 </script>
 
 <style scoped>
