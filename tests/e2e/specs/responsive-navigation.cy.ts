@@ -10,7 +10,8 @@ function loginResponsive(email: string) {
 
 function checkBottomMenu() {
   cy.get('.fx-sidenav').should('not.be.visible');
-  cy.get('.fx-topbar').should('not.be.visible');
+  cy.get('.fx-topbar').should('be.visible');
+  cy.get('.fx-topbar__menu-toggle:visible').should('have.length', 1).and('have.attr', 'aria-expanded', 'false');
   cy.get('.fx-tabbar:visible').should('have.length', 1).should($bar => {
     const bar = $bar[0].getBoundingClientRect();
     const viewport = $bar[0].ownerDocument.defaultView!;
@@ -40,6 +41,31 @@ describe('responsive app navigation', () => {
   });
 
   for (const account of responsiveAccounts) {
+    it(`provides a persistent ${account.role} top menu with direct access to secondary pages`, () => {
+      cy.viewport(390, 844);
+      loginResponsive(account.email);
+      cy.get('.fx-topbar__menu-toggle:visible').click().should('have.attr', 'aria-expanded', 'true');
+      cy.get('.fx-topbar__menu:visible').should('have.attr', 'aria-label').and('contain', 'navigation');
+      cy.get(`.fx-topbar__menu:visible a[href="${account.home}"]`).should('have.attr', 'aria-current', 'page');
+      cy.get(`.fx-topbar__menu:visible a[href="${account.extra}"]`).click();
+      cy.location('pathname').should('eq', account.extra);
+      cy.get('.fx-topbar__menu').should('not.exist');
+      checkBottomMenu();
+      cy.get('.fx-topbar__menu-toggle:visible').click();
+      cy.get(`.fx-topbar__menu:visible a[href="${account.extra}"]`).should('have.attr', 'aria-current', 'page');
+      cy.get(`.fx-topbar__menu:visible a[href="${account.home}"]`).click();
+      cy.location('pathname').should('eq', account.home);
+      cy.get('ion-content:visible').shadow().find('.inner-scroll').scrollTo('bottom');
+      cy.get('.fx-topbar__menu-toggle:visible').should('be.visible').click();
+      cy.get('.fx-topbar__menu:visible').should($menu => {
+        const bounds = $menu[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(390);
+        expect(bounds.bottom).to.be.below(772);
+      });
+      cy.get('.fx-topbar__menu-toggle:visible').trigger('keydown', { key: 'Escape' }).should('have.attr', 'aria-expanded', 'false');
+    });
+
     for (const width of [320, 768]) {
       it(`keeps the ${account.role} bottom menu usable at ${width}px and exposes secondary tools`, () => {
         cy.viewport(width, 844);
@@ -83,12 +109,16 @@ describe('responsive app navigation', () => {
     loginResponsive('admin@fixhub.com');
     cy.window().then(win => {
       const style = win.document.documentElement.style;
+      style.setProperty('--ion-safe-area-top', '28px');
       style.setProperty('--ion-safe-area-bottom', '24px');
       style.setProperty('--ion-safe-area-left', '20px');
       style.setProperty('--ion-safe-area-right', '20px');
     });
     cy.get('.fx-tabbar:visible').should($bar => {
       expect($bar[0].getBoundingClientRect().height).to.be.closeTo(96, 1);
+    });
+    cy.get('.fx-topbar:visible').should($bar => {
+      expect($bar[0].getBoundingClientRect().height).to.be.closeTo(92, 1);
     });
     cy.get('ion-content:visible').shadow().find('.inner-scroll').scrollTo('bottom');
     cy.get('.dashboard__section:visible').last().should($section => {

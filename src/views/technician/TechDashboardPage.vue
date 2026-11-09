@@ -36,7 +36,7 @@
           </div>
         </div>
 
-        <TechnicianLocationCard v-if="authState.session" :key="authState.session.userId" ref="locationCard" />
+        <TechnicianLocationCard v-if="authState.session" :key="authState.session.userId" ref="locationCard" :active="active" />
 
         <div class="fx-split dash-split">
           <div>
@@ -73,12 +73,13 @@ import TechnicianLocationCard from '../../components/technician/TechnicianLocati
 const router = useRouter();
 const { profile: getProfile, state: authState } = useAuth();
 const locationCard = ref<InstanceType<typeof TechnicianLocationCard> | null>(null);
+const active = ref(true);
 const profile = computed(getProfile);
 const { summary } = useReviews();
 const reviewSummary = computed(() => summary(technicians.find(tech => tech.name === profile.value.name)?.id ?? -1));
-onIonViewWillEnter(() => locationCard.value?.refresh());
+onIonViewWillEnter(() => { active.value = true; void locationCard.value?.refresh(); });
 onIonViewDidEnter(() => locationCard.value?.resize());
-onIonViewDidLeave(() => locationCard.value?.cancelPending());
+onIonViewDidLeave(() => { active.value = false; });
 </script>
 
 <style scoped>

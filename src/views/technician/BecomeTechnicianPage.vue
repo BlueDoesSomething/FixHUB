@@ -154,16 +154,82 @@ import { useTechnicianApplications } from '../../stores/technicianApplications';
 import AuthForm from '../../components/landing/home/AuthForm.vue';
 import TechnicianApplicationForm from '../../components/technician/TechnicianApplicationForm.vue';
 import ApplicationStatusCard from '../../components/technician/ApplicationStatusCard.vue';
+import { fetchTechnicianApplications } from '../../services/technicianApplications';
+import type { ApplicationStatus, TechnicianApplication } from '../../data/technicianApplication';
 
 const { state, profile } = useAuth();
 const store = useTechnicianApplications();
 
 const editing = ref(false);
 const justSubmitted = ref(false);
+const supabaseApps = ref<TechnicianApplication[]>([]);
+const appsLoading = ref(false);
 
 const me = computed(() => profile());
 const isAuthenticated = computed(() => state.isAuthenticated);
-const myApp = computed(() => store.mine(me.value.email));
+const currentUserId = computed(() => state.session?.userId ?? '');
+
+function mapSupabaseRowToApplication(row: any): TechnicianApplication {
+  const statusLabel = (row.status as string).charAt(0).toUpperCase() + (row.status as string).slice(1) as ApplicationStatus;
+  const serviceTypeMap: Record<string, string> = {
+    home: 'Home Service',
+    dropoff: 'Drop-off',
+    both: 'Both',
+  };
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    status: statusLabel,
+    applicant: {
+      userId: row.applicant_id,
+      fullName: row.full_name,
+      email: row.email,
+      contactNumber: row.contact_number,
+      city: row.city,
+    },
+    professional: {
+      yearsExperience: String(row.years_experience),
+      brands: row.brands ?? [],
+      specializations: row.specializations ?? [],
+      experienceDescription: row.experience_description,
+    },
+    service: {
+      serviceType: serviceTypeMap[row.service_type] ?? row.service_type,
+      coverageArea: row.coverage_area,
+      workingDays: row.working_days ?? [],
+      workingHours: row.working_hours,
+    },
+    documents: { certificates: [], workPhotos: [] },
+    review: {
+      reviewer: row.reviewer_id ?? undefined,
+      reviewedAt: row.reviewed_at ?? undefined,
+      feedback: row.feedback ?? undefined,
+      allowReapply: row.status === 'rejected' ? true : undefined,
+    },
+    history: [],
+    technicianProfileId: undefined,
+  };
+}
+
+async function loadSupabaseApps() {
+  appsLoading.value = true;
+  try {
+    const rows = await fetchTechnicianApplications();
+    supabaseApps.value = rows.map(mapSupabaseRowToApplication);
+  } catch {
+    supabaseApps.value = [];
+  } finally {
+    appsLoading.value = false;
+  }
+}
+
+const myApp = computed(() => {
+  const local = store.mine(me.value?.email ?? '');
+  if (local) return local;
+  if (!currentUserId.value) return null;
+  return supabaseApps.value.find((a) => a.applicant.userId === currentUserId.value) ?? null;
+});
 
 const benefits = [
   { title: 'More Repair Jobs', icon: 'trending-up', desc: 'Get matched with customers in your area who need your exact skills.' },
@@ -199,6 +265,7 @@ function onSubmitted() {
   justSubmitted.value = true;
   editing.value = false;
   if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 50);
+  if (isAuthenticated.value) void loadSupabaseApps();
 }
 
 let iconTimer: ReturnType<typeof setInterval> | undefined;
@@ -207,6 +274,7 @@ onMounted(() => {
     lucide.createIcons();
     iconTimer = setInterval(() => lucide.createIcons(), 600);
   }
+  if (isAuthenticated.value) void loadSupabaseApps();
 });
 onUnmounted(() => {
   if (iconTimer) clearInterval(iconTimer);

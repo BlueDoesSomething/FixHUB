@@ -16,6 +16,8 @@
         </div>
 
         <p v-if="locationError" class="location-error" role="alert">{{ locationError }}</p>
+        <p class="address-hint" role="status">{{ running ? 'Following your device location. Choose a pin to stop automatic updates.' : 'Allow device location or select a pin manually.' }} Your location is not published to the technician directory.</p>
+        <button v-if="running" class="fx-btn fx-btn-secondary fx-btn--sm" type="button" @click="gps.stop">Stop following GPS</button>
 
         <div class="fx-split location-layout">
           <div>
@@ -68,6 +70,7 @@
             <button class="fx-btn fx-btn-secondary fx-btn--block" type="button" :disabled="confirming" @click="router.push('/client/request')">Edit Device Details</button>
           </aside>
         </div>
+        <NearbyTechnicians v-if="repairState.ready" :key="draft.id" id="request-nearby" :point="selected" :active="active" :device="draft.device" :service-type="draft.serviceType" @markers="technicianMarkers = $event" />
       </div>
     </ion-content>
   </ion-page>
@@ -81,10 +84,11 @@ import ScreenHeader from '../../components/ScreenHeader.vue';
 import RepairSteps from '../../components/repair/RepairSteps.vue';
 import RepairSaveStatus from '../../components/repair/RepairSaveStatus.vue';
 import MapCanvas from '../../components/MapCanvas.vue';
+import NearbyTechnicians from '../../components/NearbyTechnicians.vue';
 import type { GeoPoint, MapMarker } from '../../types/map';
 import { DEFAULT_MAP_CENTER } from '../../data/map';
 import { useRepairDraft } from '../../stores/repair';
-import { getCurrentLocation } from '../../services/geolocation';
+import { useDeviceLocation } from '../../composables/useDeviceLocation';
 import { formatCoordinates, isGeoPoint } from '../../utils/map';
 
 const router = useRouter();
@@ -94,14 +98,18 @@ const isHome = computed(() => draft.serviceType === 'home');
 const selected = ref<GeoPoint | null>(draft.coordinates ? { ...draft.coordinates } : null);
 const address = ref(draft.coordinates ? draft.location : '');
 const center = computed(() => selected.value ?? DEFAULT_MAP_CENTER);
-const locating = ref(false);
 const accuracy = ref<number | null>(null);
-const locationError = ref('');
 const confirming = ref(false);
-let locationRequest = 0;
+const active = ref(true);
+const technicianMarkers = ref<MapMarker[]>([]);
+const gps = useDeviceLocation(() => active.value && repairState.ready && !confirming.value, !draft.coordinates, point => {
+  selected.value = { lat: point.lat, lng: point.lng };
+  accuracy.value = point.accuracy;
+});
+const { locating, running, error: locationError } = gps;
 
 const markers = computed<MapMarker[]>(() => {
-  const points: MapMarker[] = [];
+  const points: MapMarker[] = [...technicianMarkers.value];
   if (selected.value) {
     points.push({ ...selected.value, id: 'selected', kind: 'dest', label: 'You', title: 'Your selected location', draggable: true });
   }
@@ -111,34 +119,17 @@ const markers = computed<MapMarker[]>(() => {
 function selectLocation(point: GeoPoint) {
   if (!isGeoPoint(point)) return;
   // Discard a pending GPS response if the user chooses a pin manually instead.
-  locationRequest += 1;
-  locating.value = false;
-  locationError.value = '';
+  gps.stop();
   accuracy.value = null;
   selected.value = { ...point };
 }
 
-async function locate() {
-  const request = ++locationRequest;
-  locating.value = true;
-  locationError.value = '';
-  try {
-    const point = await getCurrentLocation();
-    if (request !== locationRequest) return;
-    selectLocation({ lat: point.lat, lng: point.lng });
-    accuracy.value = point.accuracy;
-  } catch (error) {
-    if (request === locationRequest) {
-      locationError.value = error instanceof Error ? error.message : 'Unable to find your location. Select a point on the map.';
-    }
-  } finally {
-    if (request === locationRequest) locating.value = false;
-  }
-}
+function locate() { address.value = ''; gps.start(); }
 
 async function confirmLocation() {
   if (!selected.value || !isGeoPoint(selected.value) || confirming.value) return;
   confirming.value = true;
+  gps.stop();
   draft.coordinates = { ...selected.value };
   draft.location = address.value.trim() || `Pinned location (${formatCoordinates(selected.value)})`;
   try { await saveDraft(); await router.push('/client/request/review'); }
@@ -147,13 +138,13 @@ async function confirmLocation() {
 }
 
 function cancelLocationRequest() {
-  locationRequest += 1;
-  locating.value = false;
+  active.value = false;
 }
 
 async function restoreLocation() {
   await initialize();
   if (!selected.value && draft.coordinates) {
+    gps.stop();
     selected.value = { ...draft.coordinates };
     address.value = draft.location;
   }
@@ -162,10 +153,12 @@ async function restoreLocation() {
 watch(() => draft.id, () => {
   selected.value = draft.coordinates ? { ...draft.coordinates } : null;
   address.value = draft.coordinates ? draft.location : '';
-  cancelLocationRequest();
+  gps.stop();
+  technicianMarkers.value = [];
+  if (!draft.coordinates) gps.start();
 });
 onMounted(restoreLocation);
-onIonViewWillEnter(restoreLocation);
+onIonViewWillEnter(() => { active.value = true; void restoreLocation(); });
 onIonViewDidEnter(() => mapRef.value?.resize());
 onIonViewDidLeave(cancelLocationRequest);
 onBeforeUnmount(cancelLocationRequest);

@@ -4,9 +4,10 @@ import { reactive } from 'vue';
 import { activeMobileNavItem, mobileNavItems, moreNavItems, navConfig } from '@/data/navigation';
 import type { Role } from '@/stores/auth';
 import FxTabBar from '@/components/FxTabBar.vue';
+import FxTopBar from '@/components/FxTopBar.vue';
 import MorePage from '@/views/shared/MorePage.vue';
 
-const navigation = vi.hoisted(() => ({ route: { path: '/admin/dashboard' }, push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ route: { path: '/admin/dashboard', meta: {} }, push: vi.fn(), back: vi.fn() }));
 vi.mock('vue-router', () => ({ useRoute: () => navigation.route, useRouter: () => navigation }));
 vi.mock('@ionic/vue', () => ({
   IonPage: { template: '<div><slot /></div>' },
@@ -17,7 +18,7 @@ vi.mock('@ionic/vue', () => ({
 }));
 
 let wrapper: VueWrapper | undefined;
-beforeEach(() => { navigation.route = reactive({ path: '/admin/dashboard' }); navigation.push.mockClear(); });
+beforeEach(() => { navigation.route = reactive({ path: '/admin/dashboard', meta: {} }); navigation.push.mockClear(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; });
 
 describe('responsive navigation configuration', () => {
@@ -60,6 +61,52 @@ describe('responsive navigation configuration', () => {
 });
 
 describe('responsive menu components', () => {
+  test.each<Role>(['client', 'technician', 'admin'])('opens a complete %s top menu and navigates to its secondary tools', async role => {
+    navigation.route.path = navConfig[role][0].route;
+    wrapper = mount(FxTopBar, { props: { items: navConfig[role], role } });
+    const toggle = wrapper.get('.fx-topbar__menu-toggle');
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('.fx-topbar__menu').exists()).toBe(false);
+    await toggle.trigger('click');
+    expect(toggle.attributes('aria-expanded')).toBe('true');
+    const menu = wrapper.get('.fx-topbar__menu');
+    expect(menu.attributes('id')).toBe(toggle.attributes('aria-controls'));
+    expect(menu.attributes('aria-label')).toMatch(/navigation$/);
+    expect(menu.findAll('a').map(link => link.attributes('href'))).toEqual(navConfig[role].filter(item => !item.mobileOnly).map(item => item.route));
+    expect(menu.get('[aria-current="page"]').attributes('href')).toBe(navigation.route.path);
+    await menu.get(`a[href="/${role}/profile"]`).trigger('click');
+    expect(navigation.push).toHaveBeenCalledWith(`/${role}/profile`);
+    expect(wrapper.find('.fx-topbar__menu').exists()).toBe(false);
+  });
+
+  test('dismisses the top menu with Escape, outside interaction, route changes, or resizing', async () => {
+    wrapper = mount(FxTopBar, { props: { items: navConfig.admin, role: 'admin' }, attachTo: document.body });
+    const toggle = wrapper.get('.fx-topbar__menu-toggle');
+    await toggle.trigger('click');
+    await wrapper.get('header').trigger('keydown', { key: 'Escape' });
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(toggle.element);
+    await toggle.trigger('click');
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    await toggle.trigger('click');
+    navigation.route.path = '/admin/users';
+    await wrapper.vm.$nextTick();
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    await toggle.trigger('click');
+    window.dispatchEvent(new Event('resize'));
+    await wrapper.vm.$nextTick();
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+  });
+
+  test('highlights the exact secondary page in the top menu rather than its parent', async () => {
+    navigation.route.path = '/client/request/location';
+    wrapper = mount(FxTopBar, { props: { items: navConfig.client, role: 'client' } });
+    await wrapper.get('.fx-topbar__menu-toggle').trigger('click');
+    expect(wrapper.get('.fx-topbar__menu [aria-current="page"]').attributes('href')).toBe('/client/request/location');
+  });
+
   test('renders only five mobile links, labels the navigation, and tracks nested active routes', async () => {
     wrapper = mount(FxTabBar, { props: { items: navConfig.admin } });
     expect(wrapper.get('nav').attributes('aria-label')).toBe('Main navigation');

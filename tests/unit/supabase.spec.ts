@@ -36,7 +36,7 @@ describe('Supabase client foundation', () => {
     expect(getSupabaseBackend()).toBe(getSupabaseBackend());
     expect(sdk.createClient).toHaveBeenCalledOnce();
     expect(sdk.createClient).toHaveBeenCalledWith('https://fixhub-example.supabase.co', 'sb_publishable_example_public_key', {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' },
     });
   });
 

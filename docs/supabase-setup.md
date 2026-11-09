@@ -6,9 +6,12 @@ Use **Supabase Auth, PostgreSQL, and Storage** with a **development project**. T
 
 ### What is done
 
-- **Database schema** — two versioned SQL migrations cover the full data model:
+- **Database schema** — five versioned SQL migrations cover the full data model:
   - Auth foundation: `profiles`, `user_roles`, `get_my_account()`, signup triggers
   - Business data: `technician_applications`, `application_events`, `technician_profiles`, `repair_requests`, `repair_photos`, `reviews`, `review_replies` + 15 RPCs with RLS on every table
+  - Reserved-keyword fix for the application and repair-request RPCs
+  - Opt-in technician service locations: private storage, safe directory RPCs, and an explicit stop-sharing action
+  - Live technician locations with server-controlled expiry and private Realtime updates
 - **Frontend auth** — login/signup forms wired to Supabase Auth:
   - `src/services/supabaseAuth.ts` — signUp, signIn, signOut, session restore, auth state listener
   - `src/stores/auth.ts` — Supabase-only session management; missing configuration never grants access
@@ -24,7 +27,9 @@ Use **Supabase Auth, PostgreSQL, and Storage** with a **development project**. T
 
 ### Cloud project status
 
-The full schema (3 migrations) is applied to the live Supabase cloud project `ssdxvkxpncrkhlvsbixj`. A third migration (`20261103000000_fix_reserved_keyword_var.sql`) fixes a critical bug where the PL/pgSQL variable name `current_role` (a PostgreSQL reserved keyword) shadowed the system function in security-definer RPCs, causing `submit_my_application` and `create_my_repair_request` to reject valid clients.
+The auth and business-data schema is applied to the live Supabase cloud project `ssdxvkxpncrkhlvsbixj`, together with both technician-location migrations. Migration history does not record `20261103000000_fix_reserved_keyword_var.sql`, but the hosted `submit_my_application` and `create_my_repair_request` definitions already use the corrected `v_role` variable. Applying that migration is non-destructive (`create or replace`) and reconciles the history before future `db push` runs.
+
+`20261103000000_fix_reserved_keyword_var.sql` fixes a critical bug where the PL/pgSQL variable name `current_role` (a PostgreSQL reserved keyword) shadowed the system function in security-definer RPCs, causing `submit_my_application` and `create_my_repair_request` to reject valid clients.
 
 All 15 RPCs are verified working via an end-to-end smoke test (`tests/supabase/live-smoke.mjs`) covering: application submission → admin approval → role promotion → repair request creation → technician acceptance → status workflow → review → reply → review summary. Three test accounts exist: client, technician, and admin.
 
@@ -53,12 +58,14 @@ npx supabase db push --dry-run
 
 The project reference appears in the dashboard project URL/settings. Enter CLI credentials only into the trusted CLI prompts. The checked-in local `project_id = "fixhub"` is not your hosted project reference.
 
-Review the dry-run. For this fresh development project, it should apply two migrations:
+Review the dry-run. For this fresh development project, it should apply five migrations:
 
 ```text
 supabase/migrations/20261101000000_auth_profiles.sql
 supabase/migrations/20261102000000_business_data.sql
 supabase/migrations/20261103000000_fix_reserved_keyword_var.sql
+supabase/migrations/20261104000000_technician_locations.sql
+supabase/migrations/20261107000000_live_technician_locations.sql
 ```
 
 When you are ready to change that development database:
@@ -81,8 +88,9 @@ npx supabase db push
 | `public.repair_photos` | Repair photo metadata (Storage object paths, max 3 per repair, each <= 5MB) |
 | `public.reviews` | One review per completed repair, by the customer (1-5 stars) |
 | `public.review_replies` | One reply per review, by the reviewed technician |
+| `public.technician_locations` | Opt-in fixed or live service pin, protected by RLS; customers only see explicitly shared safe fields |
 | `public.is_admin()` / `public.is_technician()` | Role-check helpers for RLS policies |
-| RPCs | `submit_my_application`, `admin_start_review`, `admin_request_info`, `admin_reject_application`, `admin_approve_application`, `create_my_repair_request`, `cancel_my_repair_request`, `accept_repair_request`, `advance_repair_status`, `list_my_repair_requests`, `list_available_repairs`, `technician_review_summary` |
+| RPCs | `submit_my_application`, `admin_start_review`, `admin_request_info`, `admin_reject_application`, `admin_approve_application`, `create_my_repair_request`, `cancel_my_repair_request`, `accept_repair_request`, `advance_repair_status`, `list_my_repair_requests`, `list_available_repairs`, `technician_review_summary`, `get_my_technician_location`, `save_my_technician_location`, `stop_sharing_my_technician_location`, `publish_my_live_location`, `list_located_technicians` |
 | `fixhub_private` helpers | Signup and timestamp triggers, not browser-callable APIs |
 
 Existing object-name collisions stop the migration transaction rather than overwriting tables. If anything already exists unexpectedly, stop and inspect before proceeding.
@@ -103,6 +111,10 @@ Only these public API values belong in the browser. The client also accepts a le
 Restart `npm run dev` after changing environment variables. Sign-in always requires Supabase Auth. Missing configuration or failed authentication shows an error and never grants access. Tests use isolated service/network fixtures rather than a runtime fallback.
 
 ## 4. Configure Auth in the hosted dashboard
+
+See [Google and email authentication](authentication.md) for the exact web/Android
+callback allowlist, Google OAuth provider setup, SMTP requirements, and recovery
+email templates. The Google button and email callbacks require those hosted settings.
 
 These settings are **hosted-project settings**; editing local `supabase/config.toml` does not apply them remotely:
 

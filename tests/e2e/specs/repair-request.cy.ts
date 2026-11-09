@@ -13,16 +13,17 @@ describe('repair request workflow', () => {
   });
 
   function fillDetails() {
-    cy.get('#repair-brand').type('Dell');
-    cy.get('#repair-model').type('XPS 13');
-    cy.get('#repair-problem').type('The laptop stops charging after a few minutes.');
-    cy.contains('button', 'Laptop').click();
+    cy.get('#repair-brand').type('Samsung');
+    cy.get('#repair-model').type('Galaxy Tab S9');
+    cy.get('#repair-problem').type('The tablet stops charging after a few minutes.');
+    cy.contains('button', 'Tablet').click();
   }
 
   function chooseLocation(dropoff = false) {
     cy.contains('button', 'Continue to Location').click();
     cy.location('pathname').should('eq', '/client/request/location');
-    cy.get('.leaflet-container:visible').click(150, 140);
+    cy.contains('button', 'Use map center').click();
+    cy.get('[data-testid="selected-coordinates"]').should('exist');
     cy.get('#service-address').type('Example building, Makati City');
     cy.contains('button', dropoff ? 'Confirm Starting Point' : 'Confirm Location').click();
     cy.location('pathname').should('eq', '/client/request/review');
@@ -43,6 +44,45 @@ describe('repair request workflow', () => {
     cy.get('.photo-grid img[alt="device.png"]').should('be.visible');
   }
 
+  it('offers only supported device categories on the dashboard and repair form', () => {
+    cy.get('.category__name').should($labels => {
+      expect([...$labels].map(label => label.textContent?.trim())).to.deep.eq(['Smartphone', 'Tablet', 'Other']);
+    });
+    cy.visit('/client/request');
+    cy.get('.device-option').should($buttons => {
+      expect([...$buttons].map(button => button.lastElementChild?.textContent?.trim())).to.deep.eq(['Smartphone', 'Tablet', 'Other']);
+    });
+    cy.get('#repair-brands option').should($options => {
+      const brands = [...$options].map(option => option.getAttribute('value'));
+      expect(brands).not.to.include.members(['Dell', 'HP', 'Nintendo']);
+    });
+  });
+
+  it('preserves an old unsupported draft and asks the user to choose a supported device', () => {
+    cy.window().then(win => new Cypress.Promise<void>((resolve, reject) => {
+      const request = win.indexedDB.open('fixhub-repairs-v1');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction('drafts', 'readwrite');
+        tx.objectStore('drafts').put({ ownerId: '11111111-1111-4111-8111-111111111111', draft: {
+          id: 'legacy-draft', device: 'Laptop', brand: 'Saved brand', model: 'Saved model', problem: 'Saved issue description.', photos: [], serviceType: 'home', location: '', coordinates: null,
+        } });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      };
+    }));
+    cy.visit('/client/request');
+    cy.get('[data-testid="unsupported-device"]').should('contain', 'no longer support');
+    cy.get('#repair-brand').should('have.value', 'Saved brand');
+    cy.get('#repair-model').should('have.value', 'Saved model');
+    cy.contains('button', 'Continue to Location').click();
+    cy.location('pathname').should('eq', '/client/request');
+    cy.contains('button', 'Tablet').click();
+    cy.get('[data-testid="unsupported-device"]').should('not.exist');
+    cy.get('#repair-model').should('have.value', 'Saved model');
+  });
+
   it('validates missing details instead of navigating to a location', () => {
     cy.visit('/client/request');
     cy.contains('button', 'Continue to Location').click();
@@ -60,13 +100,13 @@ describe('repair request workflow', () => {
     attachPhoto();
     cy.contains('Draft saved on this device').should('exist');
     cy.reload();
-    cy.get('#repair-brand').should('have.value', 'Dell');
-    cy.get('#repair-model').should('have.value', 'XPS 13');
+    cy.get('#repair-brand').should('have.value', 'Samsung');
+    cy.get('#repair-model').should('have.value', 'Galaxy Tab S9');
     cy.get('.photo-grid img[alt="device.png"]').should('exist');
     chooseLocation();
     cy.contains('Review your repair request').should('exist');
-    cy.contains('Dell').should('exist');
-    cy.contains('XPS 13').should('exist');
+    cy.contains('Samsung').should('exist');
+    cy.contains('Galaxy Tab S9').should('exist');
     cy.contains('Example building, Makati City').should('exist');
     cy.get('.photo-grid img:visible').should('have.length', 1);
     cy.contains('button', 'Submit Repair Request').should('be.disabled');
@@ -99,12 +139,12 @@ describe('repair request workflow', () => {
     cy.contains('Starting location').should('exist');
     cy.contains('not a confirmed shop address').should('exist');
     cy.contains('button', 'Edit Details').click();
-    cy.get('#repair-model').clear().type('XPS 15');
+    cy.get('#repair-model').clear().type('Galaxy Tab S9 FE');
     cy.contains('button', 'Continue to Location').click();
     cy.get('[data-testid="selected-coordinates"]').should('exist');
     cy.get('#service-address').should('have.value', 'Example building, Makati City');
     cy.contains('button', 'Confirm Starting Point').click();
-    cy.contains('XPS 15').should('exist');
+    cy.contains('Galaxy Tab S9 FE').should('exist');
     cy.get('#review-confirm').should('not.be.checked');
     cy.get('#review-confirm').check();
     cy.contains('button', 'Submit Repair Request').click();
@@ -131,7 +171,7 @@ describe('repair request workflow', () => {
     cy.contains('button', 'Continue to Location').click();
     cy.get('[role="alert"]').should('contain', 'Could not save on this device');
     cy.location('pathname').should('eq', '/client/request');
-    cy.get('#repair-model').should('have.value', 'XPS 13');
+    cy.get('#repair-model').should('have.value', 'Galaxy Tab S9');
     cy.contains('Request saved on this device').should('not.exist');
   });
 
@@ -157,7 +197,7 @@ describe('repair request workflow', () => {
     cy.contains('button', 'Submit Repair Request').click();
     cy.get('[role="alert"]').should('contain', 'device storage is full');
     cy.location('pathname').should('eq', '/client/request/review');
-    cy.contains('XPS 13').should('exist');
+    cy.contains('Galaxy Tab S9').should('exist');
     cy.get('@failedWrite').then(stub => (stub as unknown as { restore: () => void }).restore());
     cy.contains('button', 'Submit Repair Request').click();
     cy.contains('Request saved on this device').should('exist');

@@ -6,6 +6,8 @@ import TechnicianTabs from '../views/technician/TechnicianTabs.vue';
 import AdminTabs from '../views/admin/AdminTabs.vue';
 
 import SplashPage from '../views/auth/SplashPage.vue';
+import AuthCallbackPage from '../views/auth/AuthCallbackPage.vue';
+import ResetPasswordPage from '../views/auth/ResetPasswordPage.vue';
 import ProfilePage from '../views/shared/ProfilePage.vue';
 import { initializeAuth, useAuth } from '../stores/auth';
 
@@ -44,6 +46,8 @@ const routes: Array<RouteRecordRaw> = [
   { path: '/', name: 'landing', component: LandingPage },
   { path: '/app', redirect: '/splash' },
   { path: '/splash', name: 'splash', component: SplashPage },
+  { path: '/auth/callback', name: 'auth-callback', component: AuthCallbackPage },
+  { path: '/auth/reset-password', name: 'reset-password', component: ResetPasswordPage },
   { path: '/become-a-technician', name: 'become-technician', component: BecomeTechnicianPage },
 
   {

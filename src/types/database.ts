@@ -336,6 +336,8 @@ export type Database = {
           address: string
           is_shared: boolean
           updated_at: string
+          location_mode: 'manual' | 'live'
+          live_expires_at: string | null
         }
         Insert: {
           technician_id: string
@@ -344,6 +346,8 @@ export type Database = {
           address: string
           is_shared?: boolean
           updated_at?: string
+          location_mode?: 'manual' | 'live'
+          live_expires_at?: string | null
         }
         Update: {
           technician_id?: string
@@ -352,6 +356,8 @@ export type Database = {
           address?: string
           is_shared?: boolean
           updated_at?: string
+          location_mode?: 'manual' | 'live'
+          live_expires_at?: string | null
         }
         Relationships: [{
           foreignKeyName: "technician_locations_technician_id_fkey"
@@ -492,6 +498,8 @@ export type Database = {
           longitude: number
           address: string
           updated_at: string
+          location_mode: 'manual' | 'live'
+          live_expires_at: string | null
         }[]
       }
       is_admin: { Args: never; Returns: boolean }

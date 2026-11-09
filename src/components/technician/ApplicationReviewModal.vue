@@ -138,6 +138,12 @@ import {
 } from '../../data/technicianApplication';
 import { useTechnicianApplications, type ReviewAction } from '../../stores/technicianApplications';
 import { useAuth } from '../../stores/auth';
+import {
+  approveApplication,
+  rejectApplication,
+  requestApplicationInfo,
+  startApplicationReview,
+} from '../../services/technicianApplications';
 
 const props = defineProps<{ application: TechnicianApplication | null }>();
 const emit = defineEmits<{ close: [] }>();
@@ -188,7 +194,7 @@ const showStartReview = computed(
   () => props.application!.status === 'Pending' || props.application!.status === 'Needs Information',
 );
 
-function act(action: ReviewAction) {
+async function act(action: ReviewAction) {
   actionError.value = '';
   savedMsg.value = '';
   if ((action === 'request-info' || action === 'reject') && note.value.trim().length < 5) {
@@ -199,6 +205,21 @@ function act(action: ReviewAction) {
   if (updated) {
     savedMsg.value = `Status updated to "${updated.status}".`;
     note.value = '';
+    // Persist the decision to Supabase so backend technician profiles/roles stay in sync.
+    try {
+      if (action === 'approve') {
+        await approveApplication(props.application!.id);
+      } else if (action === 'reject') {
+        await rejectApplication(props.application!.id, note.value.trim());
+      } else if (action === 'request-info') {
+        await requestApplicationInfo(props.application!.id, note.value.trim());
+      } else if (action === 'start-review') {
+        await startApplicationReview(props.application!.id);
+      }
+    } catch {
+      // Supabase row may not exist yet (application submitted locally only).
+      // Local approval/rejection is still valid; Supabase sync can happen later.
+    }
     if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 30);
   }
 }

@@ -27,6 +27,7 @@
                 <MapCanvas v-if="draft.coordinates" ref="mapRef" height="260px" label="Review your repair location" :markers="locationMarkers" />
                 <p v-if="draft.serviceType === 'dropoff'" class="hint">This pin is your starting area, not a confirmed shop address. A technician and shop have not been assigned.</p>
               </section>
+              <NearbyTechnicians v-if="draft.coordinates" :key="draft.id" id="review-nearby" :point="draft.coordinates" :active="active" :device="draft.device" :service-type="draft.serviceType" @markers="technicianMarkers = $event" />
             </div>
             <aside class="fx-card submit-panel">
               <h2 class="fx-section-title">Before you submit</h2>
@@ -44,9 +45,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter, onIonViewDidLeave } from '@ionic/vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
 import MapCanvas from '../../components/MapCanvas.vue';
+import NearbyTechnicians from '../../components/NearbyTechnicians.vue';
 import RepairSteps from '../../components/repair/RepairSteps.vue';
 import RepairSaveStatus from '../../components/repair/RepairSaveStatus.vue';
 import RepairPhotoGallery from '../../components/repair/RepairPhotoGallery.vue';
@@ -58,9 +60,11 @@ import type { MapMarker } from '../../types/map';
 const router = useRouter();
 const { draft, state, initialize, submit } = useRepairDraft();
 const confirmed = ref(false);
+const active = ref(true);
+const technicianMarkers = ref<MapMarker[]>([]);
 const mapRef = ref<InstanceType<typeof MapCanvas> | null>(null);
 const errors = computed(() => validateRepair(draft));
-const locationMarkers = computed<MapMarker[]>(() => draft.coordinates ? [{ ...draft.coordinates, id: 'review', kind: 'dest', title: 'Your confirmed location' }] : []);
+const locationMarkers = computed<MapMarker[]>(() => draft.coordinates ? [{ ...draft.coordinates, id: 'review', kind: 'dest', title: 'Your confirmed location' }, ...technicianMarkers.value] : []);
 watch(draft, () => { confirmed.value = false; }, { deep: true });
 
 async function submitRequest() {
@@ -72,8 +76,9 @@ async function submitRequest() {
 }
 
 onMounted(initialize);
-onIonViewWillEnter(() => { confirmed.value = false; void initialize(); });
+onIonViewWillEnter(() => { active.value = true; confirmed.value = false; void initialize(); });
 onIonViewDidEnter(() => mapRef.value?.resize());
+onIonViewDidLeave(() => { active.value = false; });
 </script>
 <style scoped>
 .fx-page { color: var(--text-dark); }

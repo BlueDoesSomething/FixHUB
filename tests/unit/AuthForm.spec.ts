@@ -3,10 +3,11 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { useAuth, type Role } from '@/stores/auth';
 import { accountSession, signOutTestUser } from './fixtures/accounts';
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), signIn: vi.fn(), signUp: vi.fn(), signOut: vi.fn() }));
+const mocks = vi.hoisted(() => ({ push: vi.fn(), signIn: vi.fn(), signUp: vi.fn(), signOut: vi.fn(), google: vi.fn(), reset: vi.fn(), resend: vi.fn() }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('@/services/supabaseAuth', () => ({
   supabaseSignIn: mocks.signIn, supabaseSignUp: mocks.signUp, supabaseSignOut: mocks.signOut,
+  supabaseSignInWithGoogle: mocks.google, supabaseRequestPasswordReset: mocks.reset, supabaseResendConfirmation: mocks.resend,
   loadSession: vi.fn(), onAuthChange: vi.fn(),
 }));
 import AuthForm from '@/components/landing/home/AuthForm.vue';
@@ -90,5 +91,64 @@ describe('Supabase sign-in', () => {
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain('Connection unavailable');
     expect(auth.state.isAuthenticated).toBe(false);
+  });
+
+  test('shows pending email confirmation as a success notice and returns to login', async () => {
+    mocks.signUp.mockResolvedValue({ session: null, confirmationRequired: true });
+    wrapper = mount(AuthForm);
+    await wrapper.findAll('button').find(button => button.text() === 'Sign Up')!.trigger('click');
+    await wrapper.get('[data-testid="signup-name"]').setValue('New Customer');
+    await wrapper.get('[data-testid="signup-email"]').setValue('new@example.test');
+    await wrapper.get('[data-testid="signup-password"]').setValue('test-password-123');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('[role="status"]').text()).toContain('confirmation link');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="login-email"]').element as HTMLInputElement).value).toBe('new@example.test');
+    expect(auth.state.isAuthenticated).toBe(false);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  test('enters the dashboard immediately if signup returns a confirmed session', async () => {
+    mocks.signUp.mockResolvedValue({ session: accountSession(), confirmationRequired: false });
+    wrapper = mount(AuthForm);
+    await wrapper.findAll('button').find(button => button.text() === 'Sign Up')!.trigger('click');
+    await wrapper.get('[data-testid="signup-name"]').setValue('New Customer');
+    await wrapper.get('[data-testid="signup-email"]').setValue('new@example.test');
+    await wrapper.get('[data-testid="signup-password"]').setValue('test-password-123');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(auth.state.isAuthenticated).toBe(true);
+    expect(mocks.push).toHaveBeenCalledWith('/client/home');
+  });
+
+  test('connects Google sign-in and exposes provider failures without granting access', async () => {
+    mocks.google.mockRejectedValue(new Error('Google provider is not enabled.'));
+    wrapper = mount(AuthForm, { props: { redirect: '/become-a-technician' } });
+    await wrapper.get('[data-testid="google-sign-in"]').trigger('click');
+    await flushPromises();
+    expect(mocks.google).toHaveBeenCalledWith('/become-a-technician');
+    expect(wrapper.get('[role="alert"]').text()).toContain('not enabled');
+    expect(auth.state.isAuthenticated).toBe(false);
+  });
+
+  test('sends reset and confirmation emails without claiming whether an account exists', async () => {
+    wrapper = mount(AuthForm);
+    await wrapper.get('[data-testid="login-email"]').setValue('new@example.test');
+    await wrapper.findAll('button').find(button => button.text() === 'Resend confirmation email')!.trigger('click');
+    await flushPromises();
+    expect(mocks.resend).toHaveBeenCalledWith('new@example.test');
+    expect(wrapper.get('[role="status"]').text()).toContain('If this address');
+    await wrapper.findAll('button').find(button => button.text() === 'Forgot Password?')!.trigger('click');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(mocks.reset).toHaveBeenCalledWith('new@example.test');
+    expect(wrapper.get('[role="status"]').text()).toContain('If this address');
+  });
+
+  test('rejects an external return URL even after valid email authentication', async () => {
+    mocks.signIn.mockResolvedValue(accountSession());
+    await signIn('user@example.test', 'test-password-123', '//untrusted.example/path');
+    expect(mocks.push).toHaveBeenCalledWith('/client/home');
   });
 });

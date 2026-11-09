@@ -27,6 +27,11 @@
 
 The app's web assets are bundled in the APK; no localhost server is needed on the phone. Supabase and online maps still require internet access. Existing unconnected business-data features remain unconnected; packaging does not implement those backend queries. Email-link callbacks and native device features should be tested separately before distribution.
 
+For Google sign-in and email confirmation/recovery, configure the hosted provider,
+SMTP, and `com.fixhub.app://auth/callback` redirect allowlist as described in
+[authentication.md](authentication.md). The APK uses a system browser for Google
+OAuth and accepts the native callback on both cold and warm starts.
+
 ## What the workflow does
 
 `.github/workflows/android-apk.yml` installs the locked npm dependencies, validates the public configuration, builds the web app, runs Capacitor sync, and calls Gradle's `:app:assembleDebug`. GitHub supplies Node.js 22, Temurin Java 21, Android SDK 36, and Build Tools 36.0.0. Actions and the Gradle download are checksum-pinned. The APK uses app ID **`com.fixhub.app`** and name **FIXHUB**.

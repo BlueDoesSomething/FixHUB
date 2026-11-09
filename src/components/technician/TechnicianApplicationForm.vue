@@ -253,6 +253,10 @@ import {
   type UploadedFile,
 } from '../../data/technicianApplication';
 import { useTechnicianApplications } from '../../stores/technicianApplications';
+import {
+  submitApplication,
+  type ApplicationSubmission,
+} from '../../services/technicianApplications';
 
 const props = defineProps<{
   existing?: TechnicianApplication | null;
@@ -272,6 +276,7 @@ const errors = reactive<Record<string, string>>({});
 const fileError = ref('');
 const showConfirm = ref(false);
 const submitting = ref(false);
+const supabaseAppId = ref<string | null>(null);
 
 const form = reactive<ApplicationFormState>(emptyApplicationForm());
 
@@ -435,6 +440,12 @@ function buildPayload(): TechnicianApplicationPayload {
   };
 }
 
+const SERVICE_TYPE_TO_DB: Record<string, ApplicationSubmission['p_service_type']> = {
+  'Home Service': 'home',
+  'Drop-off': 'dropoff',
+  Both: 'both',
+};
+
 async function confirmSubmit() {
   showConfirm.value = false;
   submitting.value = true;
@@ -443,7 +454,30 @@ async function confirmSubmit() {
   const app = props.existing ? store.resubmit(props.existing.id, payload) : store.submit(payload);
   submitting.value = false;
   if (app) {
-    emit('submitted', app.id);
+    // Also submit to Supabase so admin approval and technician profiles work server-side.
+    try {
+      const dbPayload: ApplicationSubmission = {
+        p_full_name: payload.applicant.fullName,
+        p_contact_number: payload.applicant.contactNumber,
+        p_city: payload.applicant.city,
+        p_years_experience: Number(payload.professional.yearsExperience),
+        p_brands: payload.professional.brands,
+        p_specializations: payload.professional.specializations,
+        p_experience_description: payload.professional.experienceDescription,
+        p_service_type: SERVICE_TYPE_TO_DB[payload.service.serviceType],
+        p_coverage_area: payload.service.coverageArea,
+        p_working_days: payload.service.workingDays,
+        p_working_hours: payload.service.workingHours,
+      };
+      const supabaseId = await submitApplication(dbPayload);
+      supabaseAppId.value = supabaseId;
+      // Keep the local record's ID in sync with Supabase so lookups match.
+      app.id = supabaseId;
+    } catch {
+      // Supabase may not be configured yet; localStorage submission still works.
+      supabaseAppId.value = app.id;
+    }
+    emit('submitted', supabaseAppId.value ?? app.id);
     step.value = 0;
     hydrate();
   }

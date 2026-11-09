@@ -39,15 +39,15 @@ describe('Leaflet maps', () => {
     cy.viewport(390, 844);
     cy.visit('/client/request/location', {
       onBeforeLoad(win) {
-        cy.stub(win.navigator.geolocation, 'getCurrentPosition').callsFake((success: PositionCallback) => {
+        cy.stub(win.navigator.geolocation, 'watchPosition').callsFake((success: PositionCallback) => {
           success({
             coords: { latitude: 14.5995, longitude: 120.9842, accuracy: 25, altitude: null, altitudeAccuracy: null, heading: null, speed: null },
             timestamp: Date.now(),
           } as GeolocationPosition);
+          return 1;
         }).as('gps');
       },
     });
-    cy.contains('button', 'Use My Current Location').click();
     cy.get('@gps').should('have.been.calledOnce');
     cy.get('[data-testid="selected-coordinates"]').should('have.text', '14.59950, 120.98420');
     cy.contains('GPS accuracy: approximately ±25 m').should('exist');
@@ -58,12 +58,12 @@ describe('Leaflet maps', () => {
   it('allows keyboard pin placement after GPS permission is denied', () => {
     cy.visit('/client/request/location', {
       onBeforeLoad(win) {
-        cy.stub(win.navigator.geolocation, 'getCurrentPosition').callsFake((_success: PositionCallback, failure?: PositionErrorCallback) => {
+        cy.stub(win.navigator.geolocation, 'watchPosition').callsFake((_success: PositionCallback, failure?: PositionErrorCallback) => {
           failure?.({ code: 1, message: 'Denied', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
+          return 1;
         });
       },
     });
-    cy.contains('button', 'Use My Current Location').click();
     cy.get('[role="alert"]').should('contain', 'permission was denied');
     cy.get('.leaflet-container').focus().trigger('keydown', { key: 'Enter' });
     cy.get('[data-testid="selected-coordinates"]').should('exist');

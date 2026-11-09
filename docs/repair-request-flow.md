@@ -9,7 +9,14 @@
 3. `/client/request/review`: review details, photos, service, and map; confirm the
    information and submit. Edit actions return to earlier steps without losing input.
 4. `/client/requests/:requestId`: show the saved reference, pending status, photos,
-   and location. Saved requests also appear on Home and in Repair History.
+    and location. Saved requests also appear on Home and in Repair History.
+
+New requests support **Smartphone**, **Tablet**, and **Other**. Consoles, laptops,
+and desktop/computer categories are no longer offered. The dashboard and repair
+form use the same device catalog for validation. Existing history is not deleted;
+older drafts keep their details but require choosing a supported device before
+continuing or submitting. Nearby recommendations exclude profiles that declare
+only retired device categories, without discarding general repair-skill profiles.
 
 ## Persistence and submission semantics
 

@@ -1,5 +1,9 @@
 import { reactive } from 'vue';
-import { loadSession, onAuthChange, supabaseSignIn, supabaseSignOut, supabaseSignUp, type AuthSession } from '../services/supabaseAuth';
+import {
+  completeAuthCallback, loadSession, onAuthChange, supabaseSignIn, supabaseSignOut, supabaseSignUp,
+  supabaseSignInWithGoogle, supabaseRequestPasswordReset, supabaseResendConfirmation, supabaseUpdatePassword,
+  type AuthSession,
+} from '../services/supabaseAuth';
 
 export type Role = 'client' | 'technician' | 'admin';
 
@@ -66,6 +70,12 @@ const state = reactive<AuthState>({
   session: null,
 });
 
+function applySession(session: AuthSession | null) {
+  state.session = session;
+  state.role = session?.account.role ?? 'client';
+  state.isAuthenticated = !!session;
+}
+
 // Try to restore an existing Supabase session on app load.
 let initialization: Promise<void> | undefined;
 function initialize(): Promise<void> {
@@ -81,11 +91,7 @@ async function restoreSession() {
   }
   try {
     const session = await loadSession();
-    if (session) {
-      state.session = session;
-      state.role = session.account.role;
-      state.isAuthenticated = true;
-    }
+    applySession(session);
   } catch {
     // Not signed in — stay in unauthenticated state.
   } finally {
@@ -99,16 +105,8 @@ const supabaseConfigured = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.e
 if (supabaseConfigured) {
   onAuthChange((session) => {
     state.loading = false;
-    if (session) {
-      state.session = session;
-      state.role = session.account.role;
-      state.isAuthenticated = true;
-      state.error = '';
-    } else {
-      state.session = null;
-      state.isAuthenticated = false;
-      state.role = 'client';
-    }
+    applySession(session);
+    if (session) state.error = '';
   });
 } else {
   state.loading = false;
@@ -118,45 +116,65 @@ if (supabaseConfigured) {
 export { initialize as initializeAuth };
 
 export function useAuth() {
-  async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
+  async function authAction<T>(action: () => Promise<T>): Promise<T> {
     state.error = '';
     state.loading = true;
     try {
-      const session = await supabaseSignIn(email, password);
-      state.session = session;
-      state.role = session.account.role;
-      state.isAuthenticated = true;
-      return profileFromSession(session);
+      return await action();
     } catch (err) {
-      state.error = err instanceof Error ? err.message : 'Sign-in failed.';
-      state.loading = false;
+      state.error = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
       throw err;
     } finally {
       state.loading = false;
     }
   }
 
-  async function signUp(name: string, email: string, password: string): Promise<void> {
-    state.error = '';
-    state.loading = true;
-    try {
-      await supabaseSignUp(name, email, password);
-    } catch (err) {
-      state.error = err instanceof Error ? err.message : 'Sign-up failed.';
-      state.loading = false;
-      throw err;
-    } finally {
-      state.loading = false;
-    }
+  function loginWithEmail(email: string, password: string): Promise<UserProfile> {
+    return authAction(async () => {
+      const session = await supabaseSignIn(email, password);
+      applySession(session);
+      return profileFromSession(session);
+    });
+  }
+
+  function signUp(name: string, email: string, password: string): Promise<UserProfile | null> {
+    return authAction(async () => {
+      const result = await supabaseSignUp(name, email, password);
+      if (!result.session) return null;
+      applySession(result.session);
+      return profileFromSession(result.session);
+    });
+  }
+
+  function loginWithGoogle(returnPath?: string) {
+    return authAction(() => supabaseSignInWithGoogle(returnPath));
+  }
+
+  function finishAuthCallback(url: string) {
+    return authAction(async () => {
+      const result = await completeAuthCallback(url);
+      applySession(result.session);
+      return { profile: profileFromSession(result.session), recovery: result.recovery };
+    });
+  }
+
+  function requestPasswordReset(email: string) {
+    return authAction(() => supabaseRequestPasswordReset(email));
+  }
+
+  function resendConfirmation(email: string) {
+    return authAction(() => supabaseResendConfirmation(email));
+  }
+
+  function updatePassword(password: string) {
+    return authAction(() => supabaseUpdatePassword(password));
   }
 
   async function logout(): Promise<void> {
     if (state.session) {
       try { await supabaseSignOut(); } catch { /* session cleared below regardless */ }
     }
-    state.session = null;
-    state.isAuthenticated = false;
-    state.role = 'client';
+    applySession(null);
   }
 
   function profile(): UserProfile {
@@ -166,16 +184,19 @@ export function useAuth() {
 
   async function refreshSession() {
     const session = await loadSession();
-    state.session = session;
-    state.isAuthenticated = !!session;
-    state.role = session?.account.role ?? 'client';
+    applySession(session);
     return session;
   }
 
   return {
     state,
     loginWithEmail,
+    loginWithGoogle,
     signUp,
+    finishAuthCallback,
+    requestPasswordReset,
+    resendConfirmation,
+    updatePassword,
     logout,
     refreshSession,
     profile,

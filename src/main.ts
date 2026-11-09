@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router';
 import { initializeAuth } from './stores/auth';
+import { installNativeAuthLinks } from './services/authRedirect';
 
 import { IonicVue } from '@ionic/vue';
 import { createIcons, icons } from 'lucide';
@@ -63,4 +64,7 @@ router.isReady().then(async () => {
     lucide.createIcons();
   }
   app.mount('#app');
+  void installNativeAuthLinks(path => router.replace(path)).catch(() => {
+    void router.replace('/auth/callback?error=link_unavailable');
+  });
 });

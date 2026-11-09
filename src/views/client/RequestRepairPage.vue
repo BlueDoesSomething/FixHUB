@@ -16,6 +16,7 @@
               <div>
                 <section class="fx-card section">
                   <h2 class="fx-section-title">Select Device</h2>
+                  <p v-if="errors.device" class="field-hint" role="status" data-testid="unsupported-device">This draft uses a device type we no longer support. Choose a supported device below. Your other draft details have been kept.</p>
                   <div class="device-grid" role="group" aria-label="Device type">
                     <button v-for="device in devices" :key="device.name" type="button" class="device-option" :class="{ selected: draft.device === device.name }" :aria-pressed="draft.device === device.name" @click="draft.device = device.name">
                       <span class="device-option__icon">{{ device.icon }}</span><span>{{ device.name }}</span>
@@ -28,7 +29,7 @@
                   <h2 class="fx-section-title">Device Details</h2>
                   <div class="fx-field">
                     <label class="fx-label" for="repair-brand">Device brand <span aria-hidden="true">*</span></label>
-                    <input id="repair-brand" v-model="draft.brand" class="fx-input" list="repair-brands" required maxlength="100" placeholder="e.g. Apple, Samsung, Dell" :aria-invalid="attempted && !!errors.brand" :aria-describedby="attempted && errors.brand ? 'brand-error' : undefined" />
+                    <input id="repair-brand" v-model="draft.brand" class="fx-input" list="repair-brands" required maxlength="100" placeholder="e.g. Apple, Samsung, Xiaomi" :aria-invalid="attempted && !!errors.brand" :aria-describedby="attempted && errors.brand ? 'brand-error' : undefined" />
                     <datalist id="repair-brands"><option v-for="brand in brands" :key="brand" :value="brand" /></datalist>
                     <p v-if="attempted && errors.brand" id="brand-error" class="field-error">{{ errors.brand }}</p>
                   </div>
@@ -102,7 +103,7 @@ const attempted = ref(false);
 const photosBusy = ref(false);
 const saving = ref(false);
 const errors = computed(() => validateRepair(draft, false));
-const brands = ['Apple', 'Samsung', 'Xiaomi', 'OPPO', 'Vivo', 'Huawei', 'Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'Sony', 'Nintendo', 'Microsoft'];
+const brands = ['Apple', 'Samsung', 'Xiaomi', 'OPPO', 'Vivo', 'Huawei', 'Lenovo', 'ASUS', 'Acer', 'Sony', 'Microsoft'];
 
 async function save() {
   saving.value = true;

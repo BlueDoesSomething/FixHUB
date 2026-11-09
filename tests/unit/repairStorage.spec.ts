@@ -101,6 +101,16 @@ describe('IndexedDB repair storage', () => {
     expect((await loadRepairDraft('alice'))?.id).toBe(draft.id);
   });
 
+  test('loads a retired-device draft without deleting it and rejects its submission', async () => {
+    const draft = { ...validDraft(), device: 'Console' };
+    await saveRepairDraft('alice', draft);
+    await closeRepairStorage();
+    expect(await loadRepairDraft('alice')).toEqual(draft);
+    await expect(submitRepairRequest('alice', draft, emptyRepairDraft())).rejects.toThrow('required');
+    expect(await listRepairRequests('alice')).toHaveLength(0);
+    expect(await loadRepairDraft('alice')).toEqual(draft);
+  });
+
   test('a failed draft-reset write rolls back the request instead of showing false success', async () => {
     const draft = validDraft();
     await saveRepairDraft('alice', draft);

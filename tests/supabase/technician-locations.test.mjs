@@ -31,6 +31,17 @@ before(async () => {
     $$;
     grant usage on schema auth to anon, authenticated, service_role;
     grant execute on function auth.uid() to anon, authenticated, service_role;
+    -- Minimal Realtime fixture: execute our real trigger/policy without a hosted service.
+    create schema realtime;
+    create table realtime.messages (payload jsonb, event text, topic text, private boolean);
+    alter table realtime.messages enable row level security;
+    grant usage on schema realtime to authenticated, anon;
+    grant select on realtime.messages to authenticated, anon;
+    create function realtime.topic() returns text language sql stable as $$
+      select current_setting('realtime.topic', true);
+    $$;
+    create function realtime.send(payload jsonb, event text, topic text, private boolean)
+    returns void language sql as $$ insert into realtime.messages values (payload, event, topic, private); $$;
   `);
   const directory = new URL('../../supabase/migrations/', import.meta.url);
   for (const file of (await readdir(directory)).filter(file => file.endsWith('.sql')).sort()) {
@@ -66,7 +77,7 @@ test('technicians save and reload their own location; customers receive only saf
   const directory = (await db.query('select * from public.list_located_technicians()')).rows;
   assert.equal(directory.length, 1);
   assert.equal(directory[0].latitude, 14.55);
-  assert.deepEqual(Object.keys(directory[0]).sort(), ['id', 'full_name', 'specializations', 'service_type', 'latitude', 'longitude', 'address', 'updated_at'].sort());
+  assert.deepEqual(Object.keys(directory[0]).sort(), ['id', 'full_name', 'specializations', 'service_type', 'latitude', 'longitude', 'address', 'updated_at', 'location_mode', 'live_expires_at'].sort());
 });
 
 test('updates replace the saved pin, and stopping sharing removes it from the directory', async () => {
@@ -121,4 +132,63 @@ test('the database rejects invalid coordinates and empty or oversized address la
   for (const [lat, lng, address] of [[91, 0, 'Shop'], [0, -181, 'Shop'], [NaN, 0, 'Shop'], [null, 0, 'Shop'], [0, 0, '  '], [0, 0, 'x'.repeat(501)]]) {
     await rejected('select * from public.save_my_technician_location($1, $2, $3)', [lat, lng, address], /constraint/);
   }
+});
+
+test('live GPS uses the current identity and a server-controlled expiry, never a supplied address', async () => {
+  await asUser(technician);
+  const location = (await db.query('select * from public.publish_my_live_location(14.55, 121.02)')).rows[0];
+  assert.equal(location.technician_id, profileId);
+  assert.equal(location.location_mode, 'live');
+  assert.equal(location.is_shared, true);
+  assert.equal(location.address, 'Live GPS location');
+  assert.equal(new Date(location.live_expires_at) - new Date(location.updated_at), 90000);
+  await asUser(customer);
+  assert.equal((await db.query('select * from public.list_located_technicians()')).rows.length, 1);
+  await rejected('select * from public.publish_my_live_location(0, 0)', [], /Technician access/);
+  await db.exec('set role anon');
+  await rejected('select * from public.publish_my_live_location(0, 0)', [], /permission denied/);
+});
+
+test('expired live pins disappear, and a manual save restores a fixed service location', async () => {
+  await asUser(technician);
+  await db.query('select * from public.publish_my_live_location(14.55, 121.02)');
+  await db.exec("reset role; update public.technician_locations set live_expires_at = now() - interval '1 second'");
+  await asUser(customer);
+  assert.deepEqual((await db.query('select * from public.list_located_technicians()')).rows, []);
+  await asUser(technician);
+  const saved = (await db.query("select * from public.save_my_technician_location(14, 121, 'Fixed shop')")).rows[0];
+  assert.equal(saved.location_mode, 'manual');
+  assert.equal(saved.live_expires_at, null);
+  await asUser(customer);
+  assert.equal((await db.query('select * from public.list_located_technicians()')).rows[0].address, 'Fixed shop');
+});
+
+test('live updates reject invalid coordinates, inactive profiles, and revoked approval', async () => {
+  await asUser(technician);
+  await rejected('select * from public.publish_my_live_location(91, 121)', [], /constraint/);
+  await db.exec('reset role; update public.technician_profiles set is_active = false');
+  await asUser(technician);
+  await rejected('select * from public.publish_my_live_location(14, 121)', [], /active technician/);
+  await db.exec("reset role; update public.technician_profiles set is_active = true; update public.technician_applications set status = 'rejected'");
+  await asUser(technician);
+  await rejected('select * from public.publish_my_live_location(14, 121)', [], /active technician/);
+});
+
+test('directory broadcasts contain only private invalidations, and subscription policy requires an identity and the exact topic', async () => {
+  await asUser(technician);
+  await db.query('select * from public.publish_my_live_location(14.55, 121.02)');
+  await db.exec('reset role');
+  const messages = (await db.query('select * from realtime.messages')).rows;
+  assert.ok(messages.length > 0);
+  assert.ok(messages.every(row => JSON.stringify(row.payload) === '{"refresh":true}' && row.event === 'locations_changed' && row.topic === 'technician-directory' && row.private));
+  await asUser(customer);
+  await db.query("select set_config('realtime.topic', 'technician-directory', false)");
+  assert.ok((await db.query('select * from realtime.messages')).rows.length > 0);
+  await db.query("select set_config('realtime.topic', 'another-topic', false)");
+  assert.deepEqual((await db.query('select * from realtime.messages')).rows, []);
+  await db.query("select set_config('realtime.topic', 'technician-directory', false)");
+  await asUser('');
+  assert.deepEqual((await db.query('select * from realtime.messages')).rows, []);
+  await db.exec('set role anon');
+  assert.deepEqual((await db.query('select * from realtime.messages')).rows, []);
 });

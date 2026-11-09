@@ -12,7 +12,7 @@ type Store = ReturnType<typeof import('@/stores/repair')['useRepairDraft']>;
 let store: Store;
 
 function completeDraft(draft: RepairDraft) {
-  Object.assign(draft, { brand: 'Dell', model: 'XPS 13', problem: 'The laptop is not charging correctly.', location: 'Example building, Makati', coordinates: { lat: 14.5547, lng: 121.0244 } });
+  Object.assign(draft, { brand: 'Samsung', model: 'Galaxy S23', problem: 'The phone is not charging correctly.', location: 'Example building, Makati', coordinates: { lat: 14.5547, lng: 121.0244 } });
 }
 function record(draft: RepairDraft): SubmittedRepairRequest {
   return { ...draft, ownerId: 'test-client', reference: 'FH-TEST', status: 'Pending', createdAt: new Date().toISOString() };
@@ -37,7 +37,7 @@ describe('repair request state', () => {
     await store.initialize();
     expect(storage.loadRepairDraft).toHaveBeenCalledWith('test-client');
     expect(storage.listRepairRequests).toHaveBeenCalledWith('test-client');
-    store.draft.brand = 'Dell';
+    store.draft.brand = 'Samsung';
     await store.saveDraft();
     expect(storage.saveRepairDraft.mock.calls.at(-1)?.[0]).toBe('test-client');
   });
@@ -73,14 +73,14 @@ describe('repair request state', () => {
 
   test('debounces draft persistence and passes plain snapshots to storage', async () => {
     await store.initialize();
-    store.draft.brand = 'Dell';
-    store.draft.model = 'XPS 13';
+    store.draft.brand = 'Samsung';
+    store.draft.model = 'Galaxy S23';
     expect(storage.saveRepairDraft).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(350);
     expect(storage.saveRepairDraft).toHaveBeenCalledOnce();
     const value = storage.saveRepairDraft.mock.calls[0][1];
     expect(isProxy(value)).toBe(false);
-    expect(value.model).toBe('XPS 13');
+    expect(value.model).toBe('Galaxy S23');
     expect(store.state.saveStatus).toBe('saved');
   });
 
@@ -126,7 +126,7 @@ describe('repair request state', () => {
     await expect(store.submit()).rejects.toThrow('Quota exceeded');
     expect(store.state.requests).toHaveLength(0);
     expect(store.draft.id).toBe(id);
-    expect(store.draft.model).toBe('XPS 13');
+    expect(store.draft.model).toBe('Galaxy S23');
     expect(store.state.submitting).toBe(false);
     expect(store.state.error).toContain('Could not save');
     await store.submit();
@@ -137,6 +137,22 @@ describe('repair request state', () => {
     await store.initialize();
     await expect(store.submit()).rejects.toThrow('required details');
     expect(storage.submitRepairRequest).not.toHaveBeenCalled();
+  });
+
+  test('keeps an old device draft and history intact but blocks a new unsupported submission', async () => {
+    const saved = emptyRepairDraft();
+    completeDraft(saved);
+    saved.device = 'Laptop';
+    const previous = record(saved);
+    storage.loadRepairDraft.mockResolvedValue(saved);
+    storage.listRepairRequests.mockResolvedValue([previous]);
+    await store.initialize();
+    expect(store.draft).toMatchObject(saved);
+    expect(store.state.requests).toEqual([previous]);
+    await expect(store.submit()).rejects.toThrow('required details');
+    expect(storage.submitRepairRequest).not.toHaveBeenCalled();
+    expect(store.draft.device).toBe('Laptop');
+    expect(store.draft.model).toBe('Galaxy S23');
   });
 
   test('retains newer edits made during submission without treating them as submitted data', async () => {
@@ -153,7 +169,7 @@ describe('repair request state', () => {
     store.draft.problem = 'A newer edit that was not part of the submitted request.';
     finish(record(snapshot));
     const submitted = await pending;
-    expect(submitted.problem).toBe('The laptop is not charging correctly.');
+    expect(submitted.problem).toBe('The phone is not charging correctly.');
     expect(store.draft.problem).toContain('newer edit');
     expect(storage.saveRepairDraft.mock.calls.at(-1)?.[1].problem).toContain('newer edit');
   });

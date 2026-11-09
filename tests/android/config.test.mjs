@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import { validateAndroidEnvironment } from '../../scripts/validate-android-env.mjs';
 
 const config = { VITE_SUPABASE_URL: 'https://project.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test' };
@@ -36,4 +37,14 @@ test('requires paired optional map-provider settings', () => {
   assert.throws(() => validateAndroidEnvironment({ ...config, VITE_MAP_TILE_URL: 'https://tiles.example.com/{z}/{x}/{y}.png' }), /both optional/);
   assert.throws(() => validateAndroidEnvironment({ ...config, VITE_MAP_TILE_ATTRIBUTION: 'Map attribution' }), /both optional/);
   assert.doesNotThrow(() => validateAndroidEnvironment({ ...config, VITE_MAP_TILE_URL: 'https://tiles.example.com/{z}/{x}/{y}.png', VITE_MAP_TILE_ATTRIBUTION: 'Map attribution' }));
+});
+
+test('the APK declares the exact Google/email auth callback and includes the browser plugin', () => {
+  const manifest = readFileSync(new URL('../../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
+  assert.match(manifest, /android:launchMode="singleTask"/);
+  assert.match(manifest, /android.intent.action.VIEW/);
+  assert.match(manifest, /android.intent.category.BROWSABLE/);
+  assert.match(manifest, /android:scheme="com.fixhub.app" android:host="auth" android:path="\/callback"/);
+  const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  assert.ok(pkg.dependencies['@capacitor/browser']);
 });

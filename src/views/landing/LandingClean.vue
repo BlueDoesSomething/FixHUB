@@ -143,7 +143,6 @@
             <div class="flex gap-2 overflow-x-auto pb-2 md:pb-0">
               <button class="px-4 py-2 rounded-lg bg-brand-primary text-white text-xs font-bold whitespace-nowrap shrink-0">All</button>
               <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold whitespace-nowrap hover:border-brand-primary hover:text-brand-primary transition shrink-0">Smartphone</button>
-              <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold whitespace-nowrap hover:border-brand-primary hover:text-brand-primary transition shrink-0">Laptop</button>
               <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold whitespace-nowrap hover:border-brand-primary hover:text-brand-primary transition shrink-0">Tablet</button>
             </div>
           </div>

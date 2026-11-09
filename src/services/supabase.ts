@@ -40,7 +40,9 @@ export function getSupabaseBackend(): SupabaseClient<Database> {
   if (!cache.client) {
     const { url, key } = readSupabaseConfig();
     cache.client = createClient<Database>(url, key, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
+      // The callback page owns code exchange on both web and Android. Automatic
+      // URL detection would race it and consume the one-use PKCE code twice.
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' },
     });
   }
   return cache.client;

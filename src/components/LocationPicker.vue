@@ -19,9 +19,12 @@
     </div>
     <div class="location-picker__actions">
       <button class="fx-btn fx-btn-secondary fx-btn--sm" type="button" :disabled="disabled || locating" @click="locate">{{ locating ? 'Finding your location…' : 'Use My Current Location' }}</button>
+      <button v-if="running" class="fx-btn fx-btn-secondary fx-btn--sm" type="button" @click="stopFollowing">Stop following GPS</button>
       <button class="fx-btn fx-btn-secondary fx-btn--sm" type="button" :disabled="disabled" @click="mapRef?.selectCenter()">Use map center</button>
     </div>
     <p class="location-picker__hint">Click the map or drag the pin to adjust it. Keyboard: focus the map, move with arrow keys, then press Enter.</p>
+    <p class="location-picker__hint" role="status">{{ running ? 'Following device location while this map is open. Choosing a pin stops GPS updates.' : 'Manual location. Use your current location to resume GPS updates.' }}</p>
+    <p v-if="gpsError" class="location-picker__error" role="alert">{{ gpsError }}</p>
     <div class="location-picker__selection" aria-live="polite">
       <p v-if="modelValue" data-testid="selected-coordinates">Selected: {{ formatCoordinates(modelValue) }}</p>
       <p v-else>No location selected. Search for an address, use GPS, or place a pin.</p>
@@ -37,7 +40,8 @@ import MapCanvas from './MapCanvas.vue';
 import { DEFAULT_MAP_CENTER } from '../data/map';
 import type { GeoPoint, MapMarker } from '../types/map';
 import { formatCoordinates, isGeoPoint } from '../utils/map';
-import { getCurrentLocation } from '../services/geolocation';
+import type { LocatedPoint } from '../services/geolocation';
+import { useDeviceLocation } from '../composables/useDeviceLocation';
 import { searchAddresses, SEARCH_ATTRIBUTION, type AddressResult } from '../services/geocoding';
 
 const props = withDefaults(defineProps<{
@@ -46,23 +50,36 @@ const props = withDefaults(defineProps<{
   address?: string;
   label?: string;
   disabled?: boolean;
+  active?: boolean;
+  autoLocate?: boolean;
   extraMarkers?: MapMarker[];
   fallbackCenter?: GeoPoint;
 }>(), {
-  address: '', label: 'Choose a location', disabled: false,
+  address: '', label: 'Choose a location', disabled: false, active: true, autoLocate: false,
   extraMarkers: () => [], fallbackCenter: () => ({ ...DEFAULT_MAP_CENTER }),
 });
-const emit = defineEmits<{ 'update:modelValue': [point: GeoPoint]; 'update:address': [address: string] }>();
+const emit = defineEmits<{ 'update:modelValue': [point: GeoPoint]; 'update:address': [address: string]; located: [point: LocatedPoint]; following: [following: boolean] }>();
 const mapRef = ref<InstanceType<typeof MapCanvas> | null>(null);
 const query = ref('');
 const results = ref<AddressResult[]>([]);
 const searching = ref(false);
 const searched = ref(false);
-const locating = ref(false);
 const accuracy = ref<number | null>(null);
 const error = ref('');
 let operation = 0;
 let controller: AbortController | undefined;
+let hasGpsSelection = false;
+const gps = useDeviceLocation(() => props.active && !props.disabled, props.autoLocate, point => {
+  accuracy.value = point.accuracy;
+  emit('update:modelValue', { lat: point.lat, lng: point.lng });
+  if (!hasGpsSelection) emit('update:address', '');
+  hasGpsSelection = true;
+  emit('located', point);
+});
+const { locating, running, error: gpsError } = gps;
+watch(running, value => emit('following', value), { immediate: true, flush: 'sync' });
+
+function stopFollowing() { gps.stop(); hasGpsSelection = false; accuracy.value = null; }
 
 const markers = computed<MapMarker[]>(() => [
   ...props.extraMarkers,
@@ -74,7 +91,6 @@ function cancelPending() {
   controller?.abort();
   controller = undefined;
   searching.value = false;
-  locating.value = false;
   searched.value = false;
   results.value = [];
   error.value = '';
@@ -83,6 +99,7 @@ function cancelPending() {
 function choose(point: GeoPoint, address = '') {
   if (props.disabled || !isGeoPoint(point)) return;
   cancelPending();
+  stopFollowing();
   accuracy.value = null;
   emit('update:modelValue', { lat: point.lat, lng: point.lng });
   // A moved pin must not retain an unrelated search-result address.
@@ -92,6 +109,7 @@ function choose(point: GeoPoint, address = '') {
 async function search() {
   if (props.disabled || searching.value) return;
   cancelPending();
+  stopFollowing();
   const current = operation;
   controller = new AbortController();
   searching.value = true;
@@ -107,26 +125,16 @@ async function search() {
   }
 }
 
-async function locate() {
+function locate() {
   if (props.disabled || locating.value) return;
   cancelPending();
-  const current = operation;
-  locating.value = true;
-  try {
-    const point = await getCurrentLocation();
-    if (current !== operation) return;
-    choose(point);
-    accuracy.value = Number.isFinite(point.accuracy) && point.accuracy >= 0 ? point.accuracy : null;
-  } catch (cause) {
-    if (current === operation) error.value = cause instanceof Error ? cause.message : 'GPS is unavailable. Select a map pin instead.';
-  } finally {
-    if (current === operation) locating.value = false;
-  }
+  hasGpsSelection = false;
+  gps.start();
 }
 
-watch(() => props.disabled, value => { if (value) cancelPending(); });
+watch(() => props.disabled || !props.active, value => { if (value) cancelPending(); });
 onBeforeUnmount(cancelPending);
-defineExpose({ resize: () => mapRef.value?.resize(), cancelPending });
+defineExpose({ resize: () => mapRef.value?.resize(), cancelPending: () => { cancelPending(); gps.stop(); }, locate });
 </script>
 
 <style scoped>

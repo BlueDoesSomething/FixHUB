@@ -1,10 +1,11 @@
 import type { GeoPoint } from '../types/map';
 import { isGeoPoint } from '../utils/map';
+import { devices } from './catalog';
 
 export type ServiceType = 'home' | 'dropoff';
 export type RepairRequestStatus = 'Pending';
 
-export const REPAIR_DEVICES = ['Smartphone', 'Laptop', 'Desktop', 'Tablet', 'Console', 'Other'];
+export const REPAIR_DEVICES = devices.map(device => device.name);
 export const REPAIR_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 export const MAX_REPAIR_PHOTOS = 3;
 export const MAX_REPAIR_PHOTO_BYTES = 5 * 1024 * 1024;

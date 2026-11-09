@@ -6,11 +6,15 @@ import type { LocatedPoint } from '@/services/geolocation';
 import { signInTestUser } from './fixtures/accounts';
 
 const mocks = vi.hoisted(() => ({
-  push: vi.fn(), locate: vi.fn(),
+  push: vi.fn(), locate: vi.fn(), stop: vi.fn(),
+  receive: undefined as ((point: LocatedPoint) => void) | undefined,
+  fail: undefined as ((error: Error) => void) | undefined,
   leave: undefined as (() => void) | undefined,
 }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
-vi.mock('@/services/geolocation', () => ({ getCurrentLocation: mocks.locate }));
+vi.mock('@/services/geolocation', () => ({ watchCurrentLocation: mocks.locate }));
+const directory = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock('@/services/technicianLocations', () => ({ listLocatedTechnicians: directory.list, subscribeToTechnicianLocations: () => () => undefined }));
 vi.mock('@ionic/vue', () => ({
   IonPage: { template: '<div><slot /></div>' },
   IonContent: { template: '<div><slot /></div>' },
@@ -44,6 +48,8 @@ function gps() {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.locate.mockImplementation((receive, fail) => { mocks.receive = receive; mocks.fail = fail; return mocks.stop; });
+  directory.list.mockResolvedValue([]);
   signInTestUser();
   const { draft, reset, initialize } = useRepairDraft();
   await initialize();
@@ -62,7 +68,7 @@ describe('repair location selection', () => {
     expect(confirm().attributes('disabled')).toBeDefined();
     await wrapper!.get('#service-address').setValue('Example building, Makati');
     expect(confirm().attributes('disabled')).toBeDefined();
-    expect(mocks.locate).not.toHaveBeenCalled();
+    expect(mocks.locate).toHaveBeenCalledOnce();
     await wrapper!.get('[data-testid="map-select"]').trigger('click');
     await confirm().trigger('click');
     const { draft } = useRepairDraft();
@@ -89,9 +95,8 @@ describe('repair location selection', () => {
   });
 
   test('selects device coordinates and shows reported GPS accuracy', async () => {
-    mocks.locate.mockResolvedValue({ lat: 14.5995, lng: 120.9842, accuracy: 30 });
     render();
-    await gps().trigger('click');
+    mocks.receive?.({ lat: 14.5995, lng: 120.9842, accuracy: 30 });
     await flushPromises();
     expect(wrapper!.text()).toContain('14.59950, 120.98420');
     expect(wrapper!.text()).toContain('±30 m');
@@ -99,9 +104,8 @@ describe('repair location selection', () => {
   });
 
   test('shows GPS failures without preventing manual selection', async () => {
-    mocks.locate.mockRejectedValue(new Error('Location permission was denied.'));
     render();
-    await gps().trigger('click');
+    mocks.fail?.(new Error('Location permission was denied.'));
     await flushPromises();
     expect(wrapper!.get('[role="alert"]').text()).toContain('denied');
     await wrapper!.get('[data-testid="map-select"]').trigger('click');
@@ -110,24 +114,36 @@ describe('repair location selection', () => {
   });
 
   test('does not overwrite a manually chosen pin with a delayed GPS result', async () => {
-    let resolveLocation!: (point: LocatedPoint) => void;
-    mocks.locate.mockImplementation(() => new Promise<LocatedPoint>(resolve => { resolveLocation = resolve; }));
     render();
-    await gps().trigger('click');
+    const delayed = mocks.receive;
     await wrapper!.get('[data-testid="map-select"]').trigger('click');
-    resolveLocation({ lat: 15, lng: 120, accuracy: 10 });
+    delayed?.({ lat: 15, lng: 120, accuracy: 10 });
     await flushPromises();
     expect(wrapper!.get('[data-testid="selected-coordinates"]').text()).toBe('14.55470, 121.02440');
   });
 
   test('discards GPS results after leaving the cached Ionic page', async () => {
-    let resolveLocation!: (point: LocatedPoint) => void;
-    mocks.locate.mockImplementation(() => new Promise<LocatedPoint>(resolve => { resolveLocation = resolve; }));
     render();
-    await gps().trigger('click');
+    const delayed = mocks.receive;
     mocks.leave?.();
-    resolveLocation({ lat: 15, lng: 120, accuracy: 10 });
+    delayed?.({ lat: 15, lng: 120, accuracy: 10 });
     await flushPromises();
     expect(wrapper!.find('[data-testid="selected-coordinates"]').exists()).toBe(false);
+  });
+
+  test('automatically recommends nearby compatible technicians as GPS changes during a request', async () => {
+    directory.list.mockResolvedValue([
+      { id: 'near', full_name: 'Nearby Phone Technician', latitude: point.lat, longitude: point.lng, specializations: ['Smartphone'], service_type: 'home', address: 'Shop', updated_at: new Date().toISOString(), location_mode: 'manual', live_expires_at: null },
+      { id: 'wrong', full_name: 'Laptop Only', latitude: point.lat, longitude: point.lng, specializations: ['Laptop'], service_type: 'home', address: 'Shop', updated_at: new Date().toISOString(), location_mode: 'manual', live_expires_at: null },
+    ]);
+    render();
+    mocks.receive?.({ ...point, accuracy: 10 });
+    await flushPromises();
+    expect(wrapper!.findAll('[data-testid="nearby-technician"]')).toHaveLength(1);
+    expect(wrapper!.text()).toContain('Nearby Phone Technician');
+    expect(wrapper!.text()).not.toContain('Laptop Only');
+    mocks.receive?.({ lat: 16, lng: 121, accuracy: 10 });
+    await flushPromises();
+    expect(wrapper!.findAll('[data-testid="nearby-technician"]')).toHaveLength(0);
   });
 });

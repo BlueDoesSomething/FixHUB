@@ -3,8 +3,8 @@ import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { LocatedPoint } from '@/services/geolocation';
 
-const mocks = vi.hoisted(() => ({ locate: vi.fn(), search: vi.fn() }));
-vi.mock('@/services/geolocation', () => ({ getCurrentLocation: mocks.locate }));
+const mocks = vi.hoisted(() => ({ locate: vi.fn(), search: vi.fn(), stop: vi.fn(), receive: undefined as ((point: LocatedPoint) => void) | undefined, fail: undefined as ((error: Error) => void) | undefined }));
+vi.mock('@/services/geolocation', () => ({ watchCurrentLocation: mocks.locate }));
 vi.mock('@/services/geocoding', () => ({ searchAddresses: mocks.search, SEARCH_ATTRIBUTION: 'Test search provider' }));
 import LocationPicker from '@/components/LocationPicker.vue';
 
@@ -25,7 +25,10 @@ let wrapper: VueWrapper;
 const button = (text: string) => wrapper.findAll('button').find(item => item.text() === text)!;
 function render() { wrapper = mount(Harness, { global: { stubs: { MapCanvas: MapStub } } }); }
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.locate.mockImplementation((receive, fail) => { mocks.receive = receive; mocks.fail = fail; return mocks.stop; });
+});
 afterEach(() => { wrapper?.unmount(); });
 
 describe('address and GPS location picker', () => {
@@ -62,14 +65,13 @@ describe('address and GPS location picker', () => {
   });
 
   test('uses GPS with accuracy and lets permission-denied users place a pin', async () => {
-    mocks.locate.mockResolvedValue({ lat: 15, lng: 120, accuracy: 24 });
     render();
     await button('Use My Current Location').trigger('click');
+    mocks.receive?.({ lat: 15, lng: 120, accuracy: 24 });
     await flushPromises();
     expect(wrapper.text()).toContain('15.00000, 120.00000');
     expect(wrapper.text()).toContain('±24 m');
-    mocks.locate.mockRejectedValue(new Error('Location permission was denied.'));
-    await button('Use My Current Location').trigger('click');
+    mocks.fail?.(new Error('Location permission was denied.'));
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain('denied');
     await wrapper.get('[data-testid="map-pin"]').trigger('click');
@@ -77,12 +79,11 @@ describe('address and GPS location picker', () => {
   });
 
   test('ignores late GPS and search responses after manual selection or page exit', async () => {
-    let resolveGps!: (point: LocatedPoint) => void;
-    mocks.locate.mockImplementation(() => new Promise(resolve => { resolveGps = resolve; }));
     render();
     await button('Use My Current Location').trigger('click');
+    const delayed = mocks.receive;
     await wrapper.get('[data-testid="map-pin"]').trigger('click');
-    resolveGps({ lat: 15, lng: 120, accuracy: 10 });
+    delayed?.({ lat: 15, lng: 120, accuracy: 10 });
     await flushPromises();
     expect(wrapper.text()).toContain('14.55000, 121.02000');
     let resolveSearch!: (results: unknown[]) => void;
@@ -94,5 +95,26 @@ describe('address and GPS location picker', () => {
     resolveSearch([{ ...pin, id: 'late', label: 'Late result' }]);
     await flushPromises();
     expect(wrapper.text()).not.toContain('Late result');
+  });
+
+  test('automatically follows GPS when enabled, pauses on app hiding, and cleans up the watch', async () => {
+    const active = ref(true);
+    const Auto = defineComponent({ components: { LocationPicker }, setup: () => ({ active, point: ref(null) }), template: '<LocationPicker id="auto" v-model="point" auto-locate :active="active" />' });
+    wrapper = mount(Auto, { global: { stubs: { MapCanvas: MapStub } } });
+    expect(mocks.locate).toHaveBeenCalledOnce();
+    mocks.receive?.({ ...pin, accuracy: 10 });
+    await flushPromises();
+    expect(wrapper.text()).toContain('14.55000, 121.02000');
+    mocks.receive?.({ lat: 15, lng: 120, accuracy: 12 });
+    await flushPromises();
+    expect(wrapper.text()).toContain('15.00000, 120.00000');
+    active.value = false;
+    await flushPromises();
+    expect(mocks.stop).toHaveBeenCalled();
+    active.value = true;
+    await flushPromises();
+    expect(mocks.locate).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+    expect(mocks.stop).toHaveBeenCalledTimes(2);
   });
 });

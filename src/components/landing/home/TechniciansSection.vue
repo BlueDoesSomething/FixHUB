@@ -18,7 +18,6 @@
         <div class="flex gap-2 overflow-x-auto pb-2 md:pb-0">
           <button class="px-4 py-2 rounded-lg bg-white text-brand-dark text-xs font-bold whitespace-nowrap">All</button>
           <button class="px-4 py-2 rounded-lg glass-input text-white text-xs font-bold whitespace-nowrap hover:bg-white/10">Smartphone</button>
-          <button class="px-4 py-2 rounded-lg glass-input text-white text-xs font-bold whitespace-nowrap hover:bg-white/10">Laptop</button>
           <button class="px-4 py-2 rounded-lg glass-input text-white text-xs font-bold whitespace-nowrap hover:bg-white/10">Tablet</button>
         </div>
       </div>

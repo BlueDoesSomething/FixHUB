@@ -4,7 +4,7 @@ import { signInTestUser, signOutTestUser } from './fixtures/accounts';
 import { defineComponent, h } from 'vue';
 
 const api = vi.hoisted(() => ({ list: vi.fn() }));
-vi.mock('@/services/technicianLocations', () => ({ listLocatedTechnicians: api.list }));
+vi.mock('@/services/technicianLocations', () => ({ listLocatedTechnicians: api.list, subscribeToTechnicianLocations: () => () => undefined }));
 vi.mock('@ionic/vue', () => ({
   IonPage: { template: '<div><slot /></div>' }, IonContent: { template: '<div><slot /></div>' },
   onIonViewWillEnter: vi.fn(), onIonViewDidEnter: vi.fn(), onIonViewDidLeave: vi.fn(),
@@ -29,7 +29,7 @@ describe('customer technician map directory', () => {
   test('filters and sorts real shared technicians by the selected starting point and radius', async () => {
     render();
     await flushPromises();
-    expect(wrapper.findAll('[data-testid="nearby-technician"]')).toHaveLength(2);
+    expect(wrapper.findAll('[data-testid="nearby-technician"]')).toHaveLength(0);
     await wrapper.get('[data-testid="starting-point"]').trigger('click');
     expect(wrapper.findAll('[data-testid="nearby-technician"]')).toHaveLength(1);
     expect(wrapper.text()).toContain('Near Technician');
@@ -48,12 +48,13 @@ describe('customer technician map directory', () => {
     api.list.mockResolvedValue([]);
     render();
     await flushPromises();
-    expect(wrapper.text()).toContain('No technicians have shared');
+    await wrapper.get('[data-testid="starting-point"]').trigger('click');
+    expect(wrapper.text()).toContain('No matching technicians have shared');
     api.list.mockRejectedValue(new Error('Connection failed'));
     await wrapper.findAll('button').find(item => item.text() === 'Refresh')!.trigger('click');
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain('Connection failed');
-    expect(wrapper.text()).not.toContain('No technicians have shared');
+    expect(wrapper.text()).not.toContain('No matching technicians have shared');
   });
   test('discards a previous account’s delayed directory response after sign-out', async () => {
     let resolve!: (value: typeof records) => void;
