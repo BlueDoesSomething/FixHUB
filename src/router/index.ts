@@ -32,6 +32,7 @@ import CareGuidePage from '../views/client/CareGuidePage.vue';
 
 import TechDashboardPage from '../views/technician/TechDashboardPage.vue';
 import TechRequestsPage from '../views/technician/TechRequestsPage.vue';
+import TechSubscriptionPage from '../views/technician/TechSubscriptionPage.vue';
 import TechActivePage from '../views/technician/TechActivePage.vue';
 import TechReviewsPage from '../views/technician/TechReviewsPage.vue';
 import BecomeTechnicianPage from '../views/technician/BecomeTechnicianPage.vue';
@@ -82,6 +83,7 @@ const routes: Array<RouteRecordRaw> = [
       { path: '', redirect: '/technician/dashboard' },
       { path: 'dashboard', name: 'technician-dashboard', component: TechDashboardPage, meta: { title: 'Dashboard' } },
       { path: 'requests', name: 'technician-requests', component: TechRequestsPage, meta: { title: 'New Requests' } },
+      { path: 'subscription', name: 'technician-subscription', component: TechSubscriptionPage, meta: { title: 'Subscription' } },
       { path: 'active', name: 'technician-active', component: TechActivePage, meta: { title: 'Active Repairs' } },
       { path: 'reviews', name: 'technician-reviews', component: TechReviewsPage, meta: { title: 'Customer Reviews' } },
       { path: 'messages', name: 'technician-messages', component: MessagesPage, meta: { title: 'Messages' } },

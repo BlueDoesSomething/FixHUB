@@ -36,6 +36,12 @@
           </div>
         </div>
 
+        <div v-if="subscription && subscription.status !== 'active'" class="fx-card subscription-prompt">
+          <div><h2 class="fx-section-title">Technician Subscription · ₱150/month</h2>
+            <p>{{ subscription.enforced ? 'Subscribe to accept new repair requests.' : 'Sandbox subscriptions are available to test; job access is not gated yet.' }}</p></div>
+          <button class="fx-btn fx-btn-primary fx-btn--sm" @click="router.push('/technician/subscription')">View Subscription</button>
+        </div>
+
         <TechnicianLocationCard v-if="authState.session" :key="authState.session.userId" ref="locationCard" :active="active" />
 
         <div class="fx-split dash-split">
@@ -69,11 +75,13 @@ import { useAuth } from '../../stores/auth';
 import { technicians } from '../../data/catalog';
 import { useReviews } from '../../stores/reviews';
 import TechnicianLocationCard from '../../components/technician/TechnicianLocationCard.vue';
+import { getTechnicianSubscription, type TechnicianSubscription } from '../../services/technicianSubscription';
 
 const router = useRouter();
 const { profile: getProfile, state: authState } = useAuth();
 const locationCard = ref<InstanceType<typeof TechnicianLocationCard> | null>(null);
 const active = ref(true);
+const subscription = ref<TechnicianSubscription | null>(null);
 const profile = computed(getProfile);
 const { summary, refresh, state: reviewState } = useReviews();
 const reviewSummary = computed(() => summary(
@@ -86,6 +94,7 @@ onIonViewWillEnter(() => {
   void locationCard.value?.refresh();
   // Shared ratings arrive from FIXHUB; the computed summary follows reviewState.
   void refresh();
+  void getTechnicianSubscription().then(value => { subscription.value = value; }).catch(() => undefined);
 });
 onIonViewDidEnter(() => locationCard.value?.resize());
 onIonViewDidLeave(() => { active.value = false; });
@@ -93,6 +102,8 @@ onIonViewDidLeave(() => { active.value = false; });
 
 <style scoped>
 .tech-content { --background: var(--bg); }
+.subscription-prompt { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; color: var(--text-dark); }
+.subscription-prompt h2, .subscription-prompt p { margin: 0 0 6px; }
 
 .dash-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .dash-hero__eyebrow { font-size: 14px; opacity: 0.85; margin: 0 0 4px; }

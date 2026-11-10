@@ -57,4 +57,7 @@ enable_confirmations = true
 enabled = false
 
 [edge_runtime]
-enabled = false
+enabled = true
+
+[functions.paymongo-webhook]
+verify_jwt = false

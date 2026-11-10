@@ -38,6 +38,7 @@ export const navConfig: Record<Role, NavItem[]> = {
     { id: 'active', label: 'Active', tab: 'technician-active', route: '/technician/active', fab: true, icon: icon('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>', 22) },
     { id: 'messages', label: 'Messages', tab: 'technician-messages', route: '/technician/messages', icon: icon('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>') },
     { id: 'reviews', label: 'Reviews', tab: 'technician-reviews', route: '/technician/reviews', desktopOnly: true, icon: icon('<polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.6 5.8 21 7 14 2 9.3 9 8.5 12 2"/>') },
+    { id: 'subscription', label: 'Subscription', tab: 'technician-subscription', route: '/technician/subscription', desktopOnly: true, icon: icon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>') },
     { id: 'profile', label: 'Profile', tab: 'technician-profile', route: '/technician/profile', desktopOnly: true, icon: icon('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>') },
     { id: 'more', label: 'More', tab: 'technician-more', route: '/technician/more', mobileOnly: true, icon: icon('<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>') },
   ],

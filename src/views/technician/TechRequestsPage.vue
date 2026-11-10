@@ -17,6 +17,11 @@
         </div>
 
         <p v-if="loading" role="status">Loading available repairs…</p>
+        <div v-if="subscription?.enforced && subscription.status !== 'active'" class="fx-card requests-subscription" role="status">
+          <p>An active ₱150/month technician subscription is required to accept new requests.</p>
+          <button class="fx-btn fx-btn-primary fx-btn--sm" type="button" @click="router.push('/technician/subscription')">Manage Subscription</button>
+        </div>
+        <p v-if="billingError" class="requests-billing-error" role="alert">{{ billingError }}</p>
         <div v-else-if="error" class="fx-card" role="alert">
           <h2 class="fx-section-title">New requests could not be loaded</h2>
           <p>{{ error }}</p>
@@ -30,6 +35,7 @@
             :key="job.id"
             :request="job"
             :busy="busyId === job.id"
+            :locked="!!billingError || !subscription || (subscription.enforced && subscription.status !== 'active')"
             @accept="accept"
           />
         </div>
@@ -41,13 +47,18 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
 import RequestCard from '../../components/RequestCard.vue';
 import type { AvailableRepairJob } from '../../data/repair';
 import { acceptRepairJob, fetchAvailableRepairs } from '../../services/technicianRepairs';
+import { getTechnicianSubscription, type TechnicianSubscription } from '../../services/technicianSubscription';
 
+const router = useRouter();
 const jobs = ref<AvailableRepairJob[]>([]);
+const subscription = ref<TechnicianSubscription | null>(null);
+const billingError = ref('');
 const loading = ref(true);
 const error = ref('');
 const notice = ref('');
@@ -57,6 +68,9 @@ async function refresh() {
   loading.value = !jobs.value.length;
   error.value = '';
   notice.value = '';
+  billingError.value = '';
+  const billing = getTechnicianSubscription().then(value => { subscription.value = value; })
+    .catch(() => { billingError.value = 'Subscription status could not be checked. Please retry before accepting a job.'; });
   try {
     jobs.value = await fetchAvailableRepairs();
   } catch (cause) {
@@ -64,11 +78,12 @@ async function refresh() {
     error.value = cause && typeof cause === 'object' && 'message' in cause && typeof cause.message === 'string'
       ? cause.message : 'FIXHUB could not be reached. Check the connection and try again.';
   }
+  await billing;
   loading.value = false;
 }
 
 async function accept(job: AvailableRepairJob) {
-  if (busyId.value) return;
+  if (busyId.value || billingError.value || !subscription.value || (subscription.value.enforced && subscription.value.status !== 'active')) return;
   busyId.value = job.id;
   notice.value = '';
   error.value = '';
@@ -93,4 +108,7 @@ onIonViewWillEnter(() => { void refresh(); });
 .requests-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .requests-notice { margin: 0 0 16px; padding: 12px 16px; border-radius: 12px; background: var(--gradient-soft); color: var(--primary); font-size: 14px; }
 .empty { color: var(--text-dark); line-height: 1.7; }
+.requests-subscription { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; color: var(--text-dark); }
+.requests-subscription p { margin: 0; }
+.requests-billing-error { color: #7f1d1d; background: #fef2f2; padding: 12px; border-radius: 10px; }
 </style>

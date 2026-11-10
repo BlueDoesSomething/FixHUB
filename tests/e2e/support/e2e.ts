@@ -49,6 +49,7 @@ beforeEach(() => {
   cy.intercept('POST', '**/rest/v1/rpc/get_my_technician_location', []);
   cy.intercept('POST', '**/rest/v1/rpc/list_located_technicians', []);
   cy.intercept('POST', '**/rest/v1/rpc/admin_list_applications', []);
+  cy.intercept('POST', '**/rest/v1/rpc/my_technician_subscription', [{ status: 'none', next_billing_at: null, enforced: false }]);
   cy.intercept('POST', '**/rest/v1/rpc/admin_overview', {
     users: 0, technicians: 0, activeRepairs: 0, completed: 0, applications: 0,
     weekly: [], recent: [], topTechnicians: [],

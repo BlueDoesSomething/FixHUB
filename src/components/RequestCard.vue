@@ -18,8 +18,8 @@
       <div><span>Location:</span><strong>{{ request.location }}</strong></div>
     </div>
     <div class="req-card__actions">
-      <button class="rc-btn rc-btn--accept" type="button" :disabled="busy" @click="emit('accept', request)">
-        {{ busy ? 'Accepting…' : 'Accept' }}
+      <button class="rc-btn rc-btn--accept" type="button" :disabled="busy || locked" @click="emit('accept', request)">
+        {{ locked ? 'Subscription required' : busy ? 'Accepting…' : 'Accept' }}
       </button>
     </div>
   </div>
@@ -30,7 +30,7 @@ import { computed } from 'vue';
 import InitialAvatar from './InitialAvatar.vue';
 import type { AvailableRepairJob } from '../data/repair';
 
-const props = defineProps<{ request: AvailableRepairJob; busy?: boolean }>();
+const props = defineProps<{ request: AvailableRepairJob; busy?: boolean; locked?: boolean }>();
 const emit = defineEmits<{ accept: [req: AvailableRepairJob] }>();
 
 const initials = computed(() => [props.request.brand, props.request.model]

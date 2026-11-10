@@ -505,6 +505,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_technician: { Args: never; Returns: boolean }
+      my_technician_subscription: {
+        Args: never
+        Returns: { status: string; next_billing_at: string | null; enforced: boolean }[]
+      }
       list_available_repairs: {
         Args: never
         Returns: {
