@@ -30,6 +30,7 @@ export async function fetchAvailableRepairs(): Promise<AvailableRepairJob[]> {
       latitude: row.latitude ?? null,
       longitude: row.longitude ?? null,
       createdAt: row.created_at,
+      customerName: row.customer_name,
   }));
 }
 

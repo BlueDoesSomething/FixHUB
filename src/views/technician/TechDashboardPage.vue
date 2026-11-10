@@ -24,7 +24,7 @@
             <div class="fx-stat__icon fx-stat__icon--orange">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>
             </div>
-            <p class="fx-stat__value">—</p>
+            <p class="fx-stat__value">{{ incoming.length }}</p>
             <p class="fx-stat__label">Pending Requests</p>
           </div>
           <div class="fx-stat">
@@ -48,7 +48,13 @@
           <div>
             <h3 class="fx-section-title fx-section-title--lg">Incoming Requests</h3>
             <div class="fx-table">
-              <p class="fx-page__sub">No incoming requests available.</p>
+              <p v-if="incomingError" class="fx-page__sub" role="alert">Could not load new requests. Open Requests to retry.</p>
+              <p v-else-if="!incoming.length" class="fx-page__sub">No incoming requests available.</p>
+              <template v-else>
+                <div v-for="job in incoming.slice(0, 3)" :key="job.id" class="incoming-job">
+                  <strong>{{ job.customerName }}</strong><span>{{ job.brand }} {{ job.model }} · {{ job.reference }}</span>
+                </div>
+              </template>
             </div>
             <button class="fx-btn fx-btn-primary requests-cta" @click="router.push('/technician/requests')">View All Requests</button>
           </div>
@@ -68,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter, onIonViewDidEnter, onIonViewDidLeave } from '@ionic/vue';
 import { useAuth } from '../../stores/auth';
@@ -76,12 +82,17 @@ import { technicians } from '../../data/catalog';
 import { useReviews } from '../../stores/reviews';
 import TechnicianLocationCard from '../../components/technician/TechnicianLocationCard.vue';
 import { getTechnicianSubscription, type TechnicianSubscription } from '../../services/technicianSubscription';
+import { fetchAvailableRepairs } from '../../services/technicianRepairs';
+import type { AvailableRepairJob } from '../../data/repair';
 
 const router = useRouter();
 const { profile: getProfile, state: authState } = useAuth();
 const locationCard = ref<InstanceType<typeof TechnicianLocationCard> | null>(null);
 const active = ref(true);
 const subscription = ref<TechnicianSubscription | null>(null);
+const incoming = ref<AvailableRepairJob[]>([]);
+const incomingError = ref(false);
+watch(() => authState.session?.userId, () => { incoming.value = []; incomingError.value = false; }, { flush: 'sync' });
 const profile = computed(getProfile);
 const { summary, refresh, state: reviewState } = useReviews();
 const reviewSummary = computed(() => summary(
@@ -94,6 +105,10 @@ onIonViewWillEnter(() => {
   void locationCard.value?.refresh();
   // Shared ratings arrive from FIXHUB; the computed summary follows reviewState.
   void refresh();
+  const viewer = authState.session?.userId;
+  void fetchAvailableRepairs().then(jobs => {
+    if (viewer === authState.session?.userId) { incoming.value = jobs; incomingError.value = false; }
+  }).catch(() => { if (viewer === authState.session?.userId) { incoming.value = []; incomingError.value = true; } });
   void getTechnicianSubscription().then(value => { subscription.value = value; }).catch(() => undefined);
 });
 onIonViewDidEnter(() => locationCard.value?.resize());
@@ -133,6 +148,8 @@ onIonViewDidLeave(() => { active.value = false; });
 .dash-stats { margin-bottom: 28px; }
 
 .requests-cta { margin-top: 16px; }
+.incoming-job { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--hairline); font-size: 13px; }
+.incoming-job span { color: var(--text-muted); }
 .action-secondary { margin-top: 10px; }
 .recent-title { margin-top: 28px; }
 

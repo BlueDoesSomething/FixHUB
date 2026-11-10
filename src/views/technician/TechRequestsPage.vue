@@ -28,6 +28,7 @@
           <button class="fx-btn fx-btn-secondary" type="button" @click="refresh">Try Again</button>
         </div>
         <p v-if="notice" class="requests-notice" role="status">{{ notice }}</p>
+        <button v-if="notice" class="fx-btn fx-btn-secondary fx-btn--sm" type="button" @click="router.push('/technician/messages')">Open Messages</button>
 
         <div v-if="!loading && !error && jobs.length" class="fx-grid-2">
           <RequestCard
@@ -91,7 +92,7 @@ async function accept(job: AvailableRepairJob) {
     const accepted = await acceptRepairJob(job.id);
     if (accepted) {
       jobs.value = jobs.value.filter(item => item.id !== job.id);
-      notice.value = `Accepted ${job.reference}. It is now in Active Repairs.`;
+       notice.value = `Accepted ${job.reference} from ${job.customerName}. The conversation is now in Messages.`;
     } else {
       error.value = 'This request was already taken by another technician or could not be accepted. Refresh to see the current queue.';
     }

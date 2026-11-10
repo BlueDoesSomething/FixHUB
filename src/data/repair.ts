@@ -52,6 +52,7 @@ export interface AvailableRepairJob {
   latitude: number | null;
   longitude: number | null;
   createdAt: string;
+  customerName: string;
 }
 
 /** A repair assigned to the signed-in technician, with its live workflow status. */
@@ -59,7 +60,6 @@ export interface AssignedRepairJob extends AvailableRepairJob {
   status: RepairRequestStatus;
   /** Database enum value used for the next status transition. */
   dbStatus: string;
-  customerName: string;
   updatedAt: string;
   cancellationReason: string | null;
 }

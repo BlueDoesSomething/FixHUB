@@ -33,6 +33,7 @@
               <div class="details-actions">
                 <button class="fx-btn fx-btn-primary fx-btn--block" @click="router.push('/client/history')">View Repair History</button>
                 <button class="fx-btn fx-btn-secondary fx-btn--block" @click="router.push('/client/request')">Start Another Request</button>
+                <button v-if="request.status !== 'Pending' && request.status !== 'Cancelled'" class="fx-btn fx-btn-secondary fx-btn--block" @click="router.push({ name: 'client-chat', params: { repairId: request.id } })">Message Your Technician</button>
                 <button v-if="canCancel" class="fx-btn fx-btn-ghost fx-btn--block" type="button" :disabled="cancelling" @click="cancelRequest">{{ cancelling ? 'Cancelling…' : 'Cancel Request' }}</button>
               </div>
             </aside>

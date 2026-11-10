@@ -76,6 +76,14 @@ export type Database = {
         }
         Relationships: []
       }
+      repair_messages: {
+        Row: { id: string; repair_id: string; sender_id: string; body: string; created_at: string }
+        Insert: { id?: string; repair_id: string; sender_id?: string; body: string; created_at?: string }
+        Update: { id?: string; repair_id?: string; sender_id?: string; body?: string; created_at?: string }
+        Relationships: [
+          { foreignKeyName: "repair_messages_repair_id_fkey"; columns: ["repair_id"]; isOneToOne: false; referencedRelation: "repair_requests"; referencedColumns: ["id"] },
+        ]
+      }
       repair_photos: {
         Row: {
           content_type: string
@@ -514,6 +522,7 @@ export type Database = {
         Returns: {
           brand: string
           created_at: string
+          customer_name: string
           device: string
           id: string
           latitude: number
@@ -523,6 +532,21 @@ export type Database = {
           problem: string
           reference: string
           service_type: Database["public"]["Enums"]["service_type"]
+        }[]
+      }
+      list_my_repair_conversations: {
+        Args: never
+        Returns: {
+          repair_id: string
+          reference: string
+          device: string
+          model: string
+          customer_id: string
+          technician_user_id: string
+          customer_name: string
+          technician_name: string
+          status: Database["public"]["Enums"]["repair_status"]
+          last_message_at: string | null
         }[]
       }
       list_my_repair_requests: {

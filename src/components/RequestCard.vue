@@ -4,7 +4,7 @@
       <div class="req-card__customer">
         <InitialAvatar :initials="initials" gradient="linear-gradient(135deg, #146344, #1b7a54)" :size="38" />
         <div>
-          <h4>{{ request.brand }} {{ request.model }}</h4>
+          <h4>{{ request.customerName || 'A FIXHUB customer' }}</h4>
           <p>{{ request.reference }} • {{ requestedTime }}</p>
         </div>
       </div>
@@ -13,6 +13,7 @@
       </span>
     </div>
     <div class="req-card__details">
+      <div><span>Repair:</span><strong>{{ request.brand }} {{ request.model }}</strong></div>
       <div><span>Device:</span><strong>{{ request.device }}</strong></div>
       <div><span>Problem:</span><strong>{{ request.problem }}</strong></div>
       <div><span>Location:</span><strong>{{ request.location }}</strong></div>
@@ -33,8 +34,8 @@ import type { AvailableRepairJob } from '../data/repair';
 const props = defineProps<{ request: AvailableRepairJob; busy?: boolean; locked?: boolean }>();
 const emit = defineEmits<{ accept: [req: AvailableRepairJob] }>();
 
-const initials = computed(() => [props.request.brand, props.request.model]
-  .map(part => part?.trim().charAt(0)).filter(Boolean).join('').slice(0, 2).toUpperCase() || 'FH');
+const initials = computed(() => props.request.customerName?.trim().split(/\s+/)
+  .slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase() || 'FH');
 const requestedTime = computed(() => {
   const parsed = Date.parse(props.request.createdAt);
   if (!Number.isFinite(parsed)) return props.request.createdAt;

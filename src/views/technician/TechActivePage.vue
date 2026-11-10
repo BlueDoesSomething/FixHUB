@@ -52,6 +52,7 @@
             </p>
 
             <div class="active-repair__actions">
+              <RouterLink v-if="job.dbStatus !== 'cancelled'" class="fx-btn fx-btn-secondary" :to="{ name: 'technician-chat', params: { repairId: job.id } }">Message {{ job.customerName }}</RouterLink>
               <button
                 v-if="stepFor(job) && !job.cancellationReason"
                 class="fx-btn fx-btn-primary"
@@ -72,6 +73,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
 import { nextRepairStep, remoteStatusLabel, statusPillClass, type AssignedRepairJob } from '../../data/repair';

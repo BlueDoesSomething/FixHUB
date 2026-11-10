@@ -66,6 +66,8 @@ beforeEach(() => {
   });
   cy.intercept('POST', '**/rest/v1/rpc/list_available_repairs', []);
   cy.intercept('POST', '**/rest/v1/rpc/list_my_assigned_repairs', []);
+  cy.intercept('POST', '**/rest/v1/rpc/list_my_repair_conversations', []);
+  cy.intercept('GET', '**/rest/v1/repair_messages*', []);
   cy.intercept('POST', '**/rest/v1/rpc/create_my_repair_request', req => req.reply(String(req.body?.p_request_id ?? '11111111-1111-4111-8111-111111111111')));
   cy.intercept('POST', '**/rest/v1/rpc/accept_repair_request', { statusCode: 204, body: '' });
   cy.intercept('POST', '**/rest/v1/rpc/advance_repair_status', { statusCode: 204, body: '' });
