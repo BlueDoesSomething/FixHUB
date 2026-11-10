@@ -4,6 +4,7 @@
     <ion-content>
       <div class="fx-page">
         <div class="fx-page__head"><div><h1 class="fx-page__title">Customer Reviews</h1><p class="fx-page__sub">See how customers rate your repairs and respond to their feedback.</p></div></div>
+        <p v-if="state.storageError" role="alert">{{ state.storageError }}</p>
         <ReviewFeed v-if="technicianId !== null" :technician-id="technicianId" can-reply />
         <div v-else class="fx-card"><h2>No customer reviews yet</h2><p>Reviews will appear here after completed repairs.</p></div>
       </div>

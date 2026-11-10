@@ -117,7 +117,7 @@ describe('technician review feed', () => {
     await wrapper.get(`${selector} textarea`).setValue('Thank you for your feedback!');
     await wrapper.get(`${selector} form`).trigger('submit');
     expect(wrapper.get(`${selector} .review-card__reply`).text()).toContain('Thank you for your feedback!');
-    expect(wrapper.get(`${selector} [role="status"]`).text()).toContain('saved in this browser');
+    expect(wrapper.get(`${selector} [role="status"]`).text()).toContain('sent to FIXHUB');
     await wrapper.get(`${selector} button`).trigger('click');
     expect((wrapper.get(`${selector} textarea`).element as HTMLTextAreaElement).value).toBe('Thank you for your feedback!');
     await wrapper.get(`${selector} textarea`).setValue('Happy to help!');

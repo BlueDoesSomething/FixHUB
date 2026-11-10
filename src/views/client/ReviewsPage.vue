@@ -5,6 +5,7 @@
       <div class="fx-page">
         <div class="fx-page__head"><div><h1 class="fx-page__title">My Reviews</h1><p class="fx-page__sub">Share your repair experience and hear back from your technician.</p></div><button class="fx-btn fx-btn-secondary" @click="router.push('/client/history')">Repair History</button></div>
         <p v-if="success" class="review-success" role="status">{{ success }}</p>
+        <p v-if="reviewState.storageError" class="review-error" role="alert">{{ reviewState.storageError }}</p>
         <div class="reviews-layout">
           <section>
             <h2 class="fx-section-title fx-section-title--lg">To review <span class="review-count">{{ pending.length }}</span></h2>
@@ -21,7 +22,7 @@
               <small id="review-character-count">{{ comment.length }} / {{ MAX_REVIEW_LENGTH }} characters</small>
               <p class="review-form__detail">One review per completed repair. Please avoid sharing personal or contact information.</p>
               <p v-if="error" role="alert" class="review-error">{{ error }}</p>
-              <button class="fx-btn fx-btn-primary" type="submit" data-testid="submit-review">Submit review</button>
+              <button class="fx-btn fx-btn-primary" type="submit" data-testid="submit-review" :disabled="submitting">{{ submitting ? 'Sending review…' : 'Submit review' }}</button>
             </form>
             <div v-else class="fx-card review-empty"><h3>You're all caught up</h3><p>No completed repairs are waiting for a review.</p></div>
           </section>
@@ -49,7 +50,7 @@ import { useReviews } from '../../stores/reviews';
 
 const route = useRoute();
 const router = useRouter();
-const { mine, pendingRepairs, submitReview, refresh } = useReviews();
+const { state: reviewState, mine, pendingRepairs, submitReviewConfirmed, refresh } = useReviews();
 // Completed repairs and shared reviews live in FIXHUB, not only in this browser.
 onMounted(() => { void refresh(); });
 const pending = computed(pendingRepairs);
@@ -60,20 +61,24 @@ const rating = ref(0);
 const comment = ref('');
 const error = ref('');
 const success = ref('');
+const submitting = ref(false);
 watch(() => route.query.repair, value => {
   if (typeof value === 'string' && pending.value.some(repair => repair.id === value)) repairId.value = value;
 }, { immediate: true });
 
-function submit() {
+async function submit() {
+  if (submitting.value) return;
   error.value = '';
   success.value = '';
+  submitting.value = true;
   try {
-    submitReview(repairId.value, rating.value, comment.value);
+    await submitReviewConfirmed(repairId.value, rating.value, comment.value);
     repairId.value = '';
     rating.value = 0;
     comment.value = '';
-    success.value = 'Thank you! Your review was saved on this device.';
+    success.value = 'Thank you! Your review was sent to FIXHUB.';
   } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Your review could not be saved. Please try again.'; }
+  finally { submitting.value = false; }
 }
 </script>
 <style scoped>

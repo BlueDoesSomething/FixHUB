@@ -6,8 +6,7 @@ import type { RepairReview, ReviewRepair } from '../data/reviews';
  * Shares repair reviews through FIXHUB so a rating written on one device is
  * visible to the technician (and every other customer) on another.
  *
- * Every function is best-effort: the browser copy stays the source of truth
- * for this device and a backend problem never breaks the local flow.
+ * Submitted reviews and replies are shown only after FIXHUB accepts them.
  */
 
 type ReviewRow = Database['public']['Functions']['list_reviews']['Returns'][number];
@@ -15,11 +14,11 @@ type ReviewableRow = Database['public']['Functions']['list_my_reviewable_repairs
 
 /** All reviews with their customer/technician display names, newest first. */
 export async function fetchRemoteReviews(): Promise<RepairReview[]> {
-  try {
-    const backend = getSupabaseBackend();
-    const { data, error } = await backend.rpc('list_reviews');
-    if (error || !Array.isArray(data)) return [];
-    return (data as ReviewRow[]).map(row => ({
+  const backend = getSupabaseBackend();
+  const { data, error } = await backend.rpc('list_reviews');
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error('FIXHUB reviews could not be loaded.');
+  return (data as ReviewRow[]).map(row => ({
       id: row.id,
       repairId: row.repair_id,
       customerId: row.customer_id,
@@ -34,19 +33,16 @@ export async function fetchRemoteReviews(): Promise<RepairReview[]> {
         ? { comment: row.reply_comment, createdAt: row.reply_created_at }
         : undefined,
       synced: true,
-    }));
-  } catch {
-    return [];
-  }
+  }));
 }
 
 /** Completed repairs of the signed-in customer that still wait for a review. */
 export async function fetchRemoteReviewableRepairs(customer: { email: string; name: string }): Promise<ReviewRepair[]> {
-  try {
-    const backend = getSupabaseBackend();
-    const { data, error } = await backend.rpc('list_my_reviewable_repairs');
-    if (error || !Array.isArray(data)) return [];
-    return (data as ReviewableRow[]).map(row => {
+  const backend = getSupabaseBackend();
+  const { data, error } = await backend.rpc('list_my_reviewable_repairs');
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error('Reviewable repairs could not be loaded.');
+  return (data as ReviewableRow[]).map(row => {
       const device = [row.device, row.brand, row.model].map(part => part?.trim()).filter(Boolean).join(' ');
       return {
         id: row.repair_id,
@@ -60,15 +56,11 @@ export async function fetchRemoteReviewableRepairs(customer: { email: string; na
         date: row.completed_at.slice(0, 10),
         completed: true,
       };
-    });
-  } catch {
-    return [];
-  }
+  });
 }
 
 /**
- * Publishes one local review so the technician can see it. Resolves with the
- * backend review id, or null when the review stays on this device only.
+ * Publishes one completed repair review. A lost response is reconciled by repair id.
  */
 export async function publishRemoteReview(input: {
   repairId: string;
@@ -89,14 +81,17 @@ export async function publishRemoteReview(input: {
       })
       .select('id')
       .maybeSingle();
-    if (error || !data) return null;
-    return data.id;
+    if (!error && data) return data.id;
+    const { data: existing } = await backend.from('reviews').select('id,customer_id,rating,comment')
+      .eq('repair_id', input.repairId).maybeSingle();
+    return existing?.customer_id === input.customerId && existing.rating === input.rating
+      && existing.comment === input.comment ? existing.id : null;
   } catch {
     return null;
   }
 }
 
-/** Publishes the reviewed technician's response. Resolves false when it stays local. */
+/** Publishes the reviewed technician's response. Only one reply per review is supported. */
 export async function publishRemoteReply(input: { reviewId: string; technicianUserId: string; comment: string }): Promise<boolean> {
   try {
     const backend = getSupabaseBackend();
@@ -105,7 +100,10 @@ export async function publishRemoteReply(input: { reviewId: string; technicianUs
       technician_id: input.technicianUserId,
       comment: input.comment,
     });
-    return !error;
+    if (!error) return true;
+    const { data: existing } = await backend.from('review_replies').select('technician_id,comment')
+      .eq('review_id', input.reviewId).maybeSingle();
+    return existing?.technician_id === input.technicianUserId && existing.comment === input.comment;
   } catch {
     return false;
   }

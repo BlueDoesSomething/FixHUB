@@ -1,4 +1,4 @@
-import { reactive } from 'vue';
+import { reactive, watch } from 'vue';
 import {
   completedReviewRepairs, isRepairReview, MAX_REVIEW_LENGTH, mergeReviews, REVIEW_STORAGE_KEY,
   summarizeReviews, type RepairReview, type ReviewRepair,
@@ -18,7 +18,7 @@ function browserStorage(): ReviewStorage | null {
   catch { return null; }
 }
 
-export function createReviewsStore(storage: ReviewStorage | null = browserStorage()) {
+export function createReviewsStore(storage: ReviewStorage | null = browserStorage(), remoteOnly = false) {
   const state = reactive({
     reviews: [] as RepairReview[],
     storageError: '',
@@ -27,18 +27,20 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
     /** Profile id of the signed-in technician, read from FIXHUB. */
     myTechnicianProfileId: null as string | null,
   });
-  try {
-    const raw = storage?.getItem(REVIEW_STORAGE_KEY);
-    if (raw !== null && raw !== undefined) {
-      const saved: unknown = JSON.parse(raw);
-      if (!Array.isArray(saved) || !saved.every(isRepairReview)
-        || new Set(saved.map(review => review.id)).size !== saved.length
-        || new Set(saved.map(review => review.repairId)).size !== saved.length) throw new Error('Invalid saved reviews');
-      // Ignore records from the retired examples without deleting browser data.
-      state.reviews = saved.filter(review => !review.id.startsWith('sample-') && !review.repairId.startsWith('sample-'));
+  if (!remoteOnly) {
+    try {
+      const raw = storage?.getItem(REVIEW_STORAGE_KEY);
+      if (raw !== null && raw !== undefined) {
+        const saved: unknown = JSON.parse(raw);
+        if (!Array.isArray(saved) || !saved.every(isRepairReview)
+          || new Set(saved.map(review => review.id)).size !== saved.length
+          || new Set(saved.map(review => review.repairId)).size !== saved.length) throw new Error('Invalid saved reviews');
+        // Ignore records from the retired examples without deleting browser data.
+        state.reviews = saved.filter(review => !review.id.startsWith('sample-') && !review.repairId.startsWith('sample-'));
+      }
+    } catch {
+      state.storageError = 'Saved reviews could not be read. Reload after checking your browser storage. No saved data has been replaced.';
     }
-  } catch {
-    state.storageError = 'Saved reviews could not be read. Reload after checking your browser storage. No saved data has been replaced.';
   }
 
   function persist(reviews: RepairReview[]) {
@@ -52,37 +54,94 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
   }
 
   let refreshing: Promise<void> | undefined;
+  let generation = 0;
+  if (remoteOnly) watch(() => useAuth().state.session?.userId, () => {
+    generation++;
+    refreshing = undefined;
+    state.reviews = [];
+    state.remoteRepairs = [];
+    state.myTechnicianProfileId = null;
+    state.storageError = '';
+  }, { flush: 'sync' });
 
   /**
-   * Reads shared reviews and reviewable repairs from FIXHUB, merging them into
-   * the browser records. Never throws: an offline or unconfigured build simply
-   * keeps showing what this device has.
+   * Reads reviews and reviewable repairs from FIXHUB. The runtime store never
+   * presents browser-only feedback as published.
    */
   function refresh(): Promise<void> {
-    if (!isSupabaseConfigured()) return Promise.resolve();
+    if (!isSupabaseConfigured()) {
+      if (remoteOnly) state.storageError = 'Reviews need a connection to FIXHUB. Check your connection and try again.';
+      return Promise.resolve();
+    }
     if (refreshing) return refreshing;
     const auth = useAuth();
-    refreshing = (async () => {
+    const viewerId = auth.state.session?.userId;
+    const currentGeneration = generation;
+    const active = () => auth.state.session?.userId === viewerId && generation === currentGeneration;
+    const operation = (async () => {
       try {
         const customer = auth.state.isAuthenticated && auth.state.role === 'client'
           ? { email: auth.profile().email, name: auth.profile().name }
           : null;
-        const [remoteReviews, remoteRepairs, profileId] = await Promise.all([
+        const [initialReviews, initialRepairs, profileId] = await Promise.all([
           fetchRemoteReviews(),
           customer ? fetchRemoteReviewableRepairs(customer) : Promise.resolve([] as ReviewRepair[]),
           auth.state.role === 'technician' ? fetchMyTechnicianProfileId() : Promise.resolve(null),
         ]);
-        if (auth.state.isAuthenticated) {
-          state.reviews = mergeReviews(state.reviews, remoteReviews);
+        let remoteReviews = initialReviews;
+        let remoteRepairs = initialRepairs;
+        let legacyFailed = false;
+        if (remoteOnly && viewerId && active()) {
+          // Preserve older browser-only feedback without claiming it was posted.
+          // A review or reply appears only after a matching server row exists.
+          let legacy: RepairReview[] = [];
+          try {
+            const parsed: unknown = JSON.parse(browserStorage()?.getItem(REVIEW_STORAGE_KEY) ?? '[]');
+            if (Array.isArray(parsed)) legacy = parsed.filter(isRepairReview);
+          } catch { /* Unreadable old data is not deleted or presented as published. */ }
+          let restored = false;
+          for (const saved of legacy) {
+            if (!active()) return;
+            if (customer && (saved.customerId === viewerId || saved.customerId === customer.email)
+              && !remoteReviews.some(item => item.repairId === saved.repairId)) {
+              const repair = remoteRepairs.find(item => item.id === saved.repairId);
+              if (repair?.technicianProfileId) {
+                const id = await publishRemoteReview({ repairId: repair.id, technicianProfileId: repair.technicianProfileId,
+                  customerId: viewerId, rating: saved.rating, comment: saved.comment });
+                if (id) restored = true;
+                else legacyFailed = true;
+              }
+            }
+            if (profileId && saved.reply) {
+              const review = remoteReviews.find(item => item.id === saved.id || item.repairId === saved.repairId);
+              if (review && review.technicianId === profileId && !review.reply) {
+                if (await publishRemoteReply({ reviewId: review.id, technicianUserId: viewerId,
+                  comment: saved.reply.comment })) restored = true;
+                else legacyFailed = true;
+              }
+            }
+          }
+          if (restored) {
+            [remoteReviews, remoteRepairs] = await Promise.all([
+              fetchRemoteReviews(),
+              customer ? fetchRemoteReviewableRepairs(customer) : Promise.resolve([] as ReviewRepair[]),
+            ]);
+          }
+        }
+        if (auth.state.isAuthenticated && active()) {
+          state.reviews = remoteOnly ? remoteReviews : mergeReviews(state.reviews, remoteReviews);
           state.remoteRepairs = remoteRepairs;
           if (profileId) state.myTechnicianProfileId = profileId;
+          state.storageError = legacyFailed
+            ? 'Earlier feedback could not be delivered to FIXHUB. It is not published; check your connection and refresh to retry.' : '';
         }
       } catch {
-        // Shared reads are supplementary; browser records stay available.
+        if (remoteOnly && active()) state.storageError = 'Reviews could not be loaded from FIXHUB. Check your connection and try again.';
       } finally {
-        refreshing = undefined;
+        if (generation === currentGeneration) refreshing = undefined;
       }
     })();
+    refreshing = operation;
     return refreshing;
   }
 
@@ -98,9 +157,9 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
     const auth = useAuth();
     if (!auth.state.isAuthenticated) return [];
     const email = auth.profile().email;
-    const local = completedReviewRepairs.filter(repair => repair.customerId === email && repair.completed);
+    const local = remoteOnly ? [] : completedReviewRepairs.filter(repair => repair.customerId === email && repair.completed);
     const remote = auth.state.role === 'client'
-      ? state.remoteRepairs.filter(repair => !local.some(item => item.id === repair.id))
+      ? state.remoteRepairs.filter(repair => repair.customerId === email && !local.some(item => item.id === repair.id))
       : [];
     return [...local, ...remote];
   }
@@ -116,6 +175,14 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
   }
 
   function submitReview(repairId: string, rating: number, comment: string) {
+    if (remoteOnly) throw new Error('Reviews must be confirmed by FIXHUB before they appear.');
+    const { review, repair } = prepareReview(repairId, rating, comment);
+    persist([review, ...state.reviews]);
+    publishReview(review, repair);
+    return review;
+  }
+
+  function prepareReview(repairId: string, rating: number, comment: string) {
     const auth = useAuth();
     if (!auth.state.isAuthenticated || auth.state.role !== 'client') throw new Error('Sign in as a customer to leave a review.');
     const repair = candidateRepairs().find(repair => repair.id === repairId);
@@ -135,9 +202,23 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
       comment: comment.trim(),
       createdAt: new Date().toISOString(),
     };
-    persist([review, ...state.reviews]);
-    publishReview(review, repair);
-    return review;
+    return { review, repair };
+  }
+
+  async function submitReviewConfirmed(repairId: string, rating: number, comment: string) {
+    if (!remoteOnly) return submitReview(repairId, rating, comment); // Isolated browser fixture tests.
+    const { review, repair } = prepareReview(repairId, rating, comment);
+    const userId = useAuth().state.session?.userId;
+    if (!repair.technicianProfileId || !userId || !isSupabaseConfigured()) {
+      throw new Error('This repair is not available for a FIXHUB review. Check your connection and try again.');
+    }
+    const id = await publishRemoteReview({ repairId, technicianProfileId: repair.technicianProfileId,
+      customerId: userId, rating, comment: review.comment });
+    if (useAuth().state.session?.userId !== userId) throw new Error('The signed-in account changed. Refresh your reviews.');
+    if (!id) throw new Error('Your review could not be sent to FIXHUB. Please try again.');
+    const confirmed = { ...review, id, customerId: userId, synced: true };
+    state.reviews = [confirmed, ...state.reviews.filter(item => item.repairId !== repairId)];
+    return confirmed;
   }
 
   /** Offer a review of a FIXHUB repair to the backend once, best effort. */
@@ -161,6 +242,7 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
   }
 
   function saveReply(reviewId: string, comment: string) {
+    if (remoteOnly) throw new Error('Replies must be confirmed by FIXHUB before they appear.');
     const auth = useAuth();
     const review = state.reviews.find(review => review.id === reviewId);
     const technician = technicians.find(tech => tech.name === auth.profile().name);
@@ -175,6 +257,26 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
     const updated = { ...review, reply: { comment: comment.trim(), createdAt: new Date().toISOString() } };
     persist(state.reviews.map(item => item.id === reviewId ? updated : item));
     publishReply(updated);
+  }
+
+  async function saveReplyConfirmed(reviewId: string, comment: string) {
+    if (!remoteOnly) { saveReply(reviewId, comment); return; } // Isolated browser fixture tests.
+    const auth = useAuth();
+    const review = state.reviews.find(item => item.id === reviewId);
+    const userId = auth.state.session?.userId;
+    if (!auth.state.isAuthenticated || auth.state.role !== 'technician' || !userId
+      || !review?.synced || typeof review.technicianId !== 'string'
+      || review.technicianId !== state.myTechnicianProfileId) {
+      throw new Error('Only the technician who received this review can reply.');
+    }
+    if (review.reply) throw new Error('This review already has a response. FIXHUB allows one reply per review.');
+    if (!comment.trim() || comment.length > MAX_REVIEW_LENGTH) throw new Error(`Enter a reply of 1–${MAX_REVIEW_LENGTH} characters.`);
+    if (!await publishRemoteReply({ reviewId, technicianUserId: userId, comment: comment.trim() })) {
+      throw new Error('Your reply could not be sent to FIXHUB. Please try again.');
+    }
+    if (auth.state.session?.userId !== userId) throw new Error('The signed-in account changed. Refresh your reviews.');
+    state.reviews = state.reviews.map(item => item.id === reviewId
+      ? { ...item, reply: { comment: comment.trim(), createdAt: new Date().toISOString() } } : item);
   }
 
   /** Send a shared review's response to FIXHUB so the customer sees it anywhere. */
@@ -192,10 +294,12 @@ export function createReviewsStore(storage: ReviewStorage | null = browserStorag
     pendingRepairs,
     forTechnician,
     submitReview,
+    submitReviewConfirmed,
     saveReply,
+    saveReplyConfirmed,
     summary: (technicianId: number | string) => summarizeReviews(forTechnician(technicianId)),
   };
 }
 
-const store = createReviewsStore();
+const store = createReviewsStore(null, true);
 export function useReviews() { return store; }

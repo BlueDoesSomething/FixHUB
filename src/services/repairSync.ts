@@ -3,11 +3,9 @@ import type { Database } from '../types/database';
 import { remoteStatusLabel, type SubmittedRepairRequest } from '../data/repair';
 
 /**
- * Publishes browser-saved repair requests to FIXHUB so technicians and admins
- * can see them, and reads them back on any device the customer signs into.
- *
- * Every function is best-effort: local IndexedDB records stay the source of
- * truth for this device, and a backend problem never breaks the local flow.
+ * Submitted requests are authoritative only after FIXHUB confirms them.
+ * Browser-saved records from older versions may still be retried, but they
+ * never count as submitted requests until the server has accepted them.
  */
 
 const PHOTO_BUCKET = 'repair-photos';
@@ -70,34 +68,28 @@ async function uploadRepairPhotos(backend: Backend, record: SubmittedRepairReque
   }
 }
 
-/** Every request of the signed-in customer, newest first. */
+/** Every confirmed request of the signed-in customer, newest first. */
 export async function fetchRemoteRepairRequests(ownerId: string): Promise<SubmittedRepairRequest[]> {
-  try {
-    const backend = getSupabaseBackend();
-    const { data: rows, error } = await backend.from('repair_requests')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error || !rows?.length) return [];
-    return await hydrate(backend, rows as RepairRequestRow[], ownerId);
-  } catch {
-    return [];
-  }
+  const backend = getSupabaseBackend();
+  const { data: rows, error } = await backend.from('repair_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  if (!rows?.length) return [];
+  return hydrate(backend, rows as RepairRequestRow[], ownerId);
 }
 
-/** Single request fallback for the details page when this device has no copy. */
+/** A request is shown only if it exists in FIXHUB. */
 export async function fetchRemoteRepairRequest(ownerId: string, requestId: string): Promise<SubmittedRepairRequest | null> {
-  try {
-    const backend = getSupabaseBackend();
-    const { data: row, error } = await backend.from('repair_requests')
-      .select('*')
-      .eq('id', requestId)
-      .maybeSingle();
-    if (error || !row) return null;
-    const [ hydrated ] = await hydrate(backend, [row as RepairRequestRow], ownerId);
-    return hydrated ?? null;
-  } catch {
-    return null;
-  }
+  const backend = getSupabaseBackend();
+  const { data: row, error } = await backend.from('repair_requests')
+    .select('*')
+    .eq('id', requestId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) return null;
+  const [hydrated] = await hydrate(backend, [row as RepairRequestRow], ownerId);
+  return hydrated ?? null;
 }
 
 async function hydrate(backend: Backend, rows: RepairRequestRow[], ownerId: string): Promise<SubmittedRepairRequest[]> {
@@ -166,32 +158,12 @@ export async function cancelRepairRequest(requestId: string): Promise<boolean> {
   }
 }
 
-/**
- * Local records keep their photos and identity; the backend wins on lifecycle
- * fields so status changes made by a technician show up on every device.
- * Requests that only exist on this device stay listed as local-only.
- */
+/** Older local-only records are never presented as submitted requests. */
 export function mergeRepairRequests(
-  local: readonly SubmittedRepairRequest[],
+  _local: readonly SubmittedRepairRequest[],
   remote: readonly SubmittedRepairRequest[],
 ): SubmittedRepairRequest[] {
-  const merged = new Map<string, SubmittedRepairRequest>();
-  for (const request of remote) merged.set(request.id, { ...request });
-  for (const request of local) {
-    const published = merged.get(request.id);
-    merged.set(request.id, published
-      ? {
-        ...published,
-        ...request,
-        status: published.status,
-        updatedAt: published.updatedAt ?? request.updatedAt,
-        reference: request.reference,
-        photos: request.photos.length ? request.photos : published.photos,
-        synced: true,
-        syncError: undefined,
-      }
-      : request);
-  }
-  return [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return remote.map(request => ({ ...request, synced: true }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 

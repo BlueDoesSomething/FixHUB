@@ -1,7 +1,7 @@
 <template>
   <div class="fx-grid-2">
     <article v-for="request in requests" :key="request.id" class="fx-card saved-request" data-testid="saved-request">
-      <div class="saved-request__head"><h3>{{ request.brand }} {{ request.model }}</h3><span class="fx-pill" :class="statusPillClass(request)">{{ request.synced ? request.status : 'Pending · local' }}</span></div>
+      <div class="saved-request__head"><h3>{{ request.brand }} {{ request.model }}</h3><span class="fx-pill" :class="statusPillClass(request)">{{ request.status }}</span></div>
       <p class="saved-request__ref">{{ request.reference }} · {{ request.device }}</p>
       <p class="saved-request__problem">{{ request.problem.length > 180 ? `${request.problem.slice(0, 180)}…` : request.problem }}</p>
       <p class="saved-request__meta">{{ serviceLabel(request.serviceType) }} · {{ request.photos.length }} photo(s) · {{ new Date(request.createdAt).toLocaleDateString() }}</p>

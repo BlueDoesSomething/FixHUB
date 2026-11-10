@@ -3,10 +3,14 @@ import { isProxy } from 'vue';
 import { emptyRepairDraft, type RepairDraft, type SubmittedRepairRequest } from '@/data/repair';
 
 const storage = vi.hoisted(() => ({
-  loadRepairDraft: vi.fn(), listRepairRequests: vi.fn(), saveRepairDraft: vi.fn(), submitRepairRequest: vi.fn(),
+  loadRepairDraft: vi.fn(), listRepairRequests: vi.fn(), markRepairRequestSynced: vi.fn(), saveRepairDraft: vi.fn(),
   repairStorageMessage: vi.fn(() => 'Could not save on this device.'),
 }));
 vi.mock('@/services/repairStorage', () => storage);
+const remote = vi.hoisted(() => ({ pushRepairRequest: vi.fn(), fetchRemoteRepairRequests: vi.fn(),
+  mergeRepairRequests: vi.fn((_local: SubmittedRepairRequest[], requests: SubmittedRepairRequest[]) => requests) }));
+vi.mock('@/services/repairSync', () => remote);
+vi.mock('@/services/supabase', () => ({ isSupabaseConfigured: () => true }));
 
 type Store = ReturnType<typeof import('@/stores/repair')['useRepairDraft']>;
 let store: Store;
@@ -25,7 +29,9 @@ beforeEach(async () => {
   storage.loadRepairDraft.mockResolvedValue(null);
   storage.listRepairRequests.mockResolvedValue([]);
   storage.saveRepairDraft.mockResolvedValue(undefined);
-  storage.submitRepairRequest.mockImplementation(async (_owner, draft) => record(draft));
+  storage.markRepairRequestSynced.mockResolvedValue(undefined);
+  remote.pushRepairRequest.mockResolvedValue(true);
+  remote.fetchRemoteRepairRequests.mockResolvedValue([]);
   const { signInTestUser } = await import('./fixtures/accounts');
   signInTestUser();
   store = (await import('@/stores/repair')).useRepairDraft();
@@ -97,19 +103,19 @@ describe('repair request state', () => {
     expect(storage.saveRepairDraft.mock.calls.at(-1)?.[1].problem).toBe(store.draft.problem);
   });
 
-  test('coalesces duplicate submit clicks and resets only after a successful commit', async () => {
+  test('coalesces duplicate submit clicks and resets only after FIXHUB confirms the request', async () => {
     await store.initialize();
     completeDraft(store.draft);
-    let finish!: (record: SubmittedRepairRequest) => void;
-    storage.submitRepairRequest.mockImplementation(() => new Promise<SubmittedRepairRequest>(resolve => { finish = resolve; }));
+    let finish!: (confirmed: boolean) => void;
+    remote.pushRepairRequest.mockImplementation(() => new Promise<boolean>(resolve => { finish = resolve; }));
     const original = { ...store.draft };
     const first = store.submit();
     const second = store.submit();
     expect(first).toBe(second);
     await vi.advanceTimersByTimeAsync(0);
-    expect(storage.submitRepairRequest).toHaveBeenCalledOnce();
+    expect(remote.pushRepairRequest).toHaveBeenCalledOnce();
     expect(store.draft.id).toBe(original.id);
-    finish(record(original));
+    finish(true);
     await first;
     expect(store.state.requests).toHaveLength(1);
     expect(store.draft.id).not.toBe(original.id);
@@ -118,17 +124,17 @@ describe('repair request state', () => {
     expect(store.draft.coordinates).toBeNull();
   });
 
-  test('preserves the draft when submission fails and permits a successful retry', async () => {
+  test('preserves the draft when sending fails and permits a successful retry', async () => {
     await store.initialize();
     completeDraft(store.draft);
     const id = store.draft.id;
-    storage.submitRepairRequest.mockRejectedValueOnce(new Error('Quota exceeded'));
-    await expect(store.submit()).rejects.toThrow('Quota exceeded');
+    remote.pushRepairRequest.mockResolvedValueOnce(false);
+    await expect(store.submit()).rejects.toThrow('Could not send');
     expect(store.state.requests).toHaveLength(0);
     expect(store.draft.id).toBe(id);
     expect(store.draft.model).toBe('Galaxy S23');
     expect(store.state.submitting).toBe(false);
-    expect(store.state.error).toContain('Could not save');
+    expect(store.state.error).toContain('Could not send');
     await store.submit();
     expect(store.state.requests).toHaveLength(1);
   });
@@ -136,10 +142,10 @@ describe('repair request state', () => {
   test('rejects an incomplete draft before calling the storage transaction', async () => {
     await store.initialize();
     await expect(store.submit()).rejects.toThrow('required details');
-    expect(storage.submitRepairRequest).not.toHaveBeenCalled();
+    expect(remote.pushRepairRequest).not.toHaveBeenCalled();
   });
 
-  test('keeps an old device draft and history intact but blocks a new unsupported submission', async () => {
+  test('keeps an old device draft but never lists unsent browser records as submitted', async () => {
     const saved = emptyRepairDraft();
     completeDraft(saved);
     saved.device = 'Laptop';
@@ -148,9 +154,9 @@ describe('repair request state', () => {
     storage.listRepairRequests.mockResolvedValue([previous]);
     await store.initialize();
     expect(store.draft).toMatchObject(saved);
-    expect(store.state.requests).toEqual([previous]);
+    expect(store.state.requests).toEqual([]);
     await expect(store.submit()).rejects.toThrow('required details');
-    expect(storage.submitRepairRequest).not.toHaveBeenCalled();
+    expect(remote.pushRepairRequest).toHaveBeenCalledWith(previous, 'test-client');
     expect(store.draft.device).toBe('Laptop');
     expect(store.draft.model).toBe('Galaxy S23');
   });
@@ -158,16 +164,14 @@ describe('repair request state', () => {
   test('retains newer edits made during submission without treating them as submitted data', async () => {
     await store.initialize();
     completeDraft(store.draft);
-    let finish!: (record: SubmittedRepairRequest) => void;
-    let snapshot!: RepairDraft;
-    storage.submitRepairRequest.mockImplementation((_owner, draft) => {
-      snapshot = draft;
-      return new Promise<SubmittedRepairRequest>(resolve => { finish = resolve; });
+    let finish!: (confirmed: boolean) => void;
+    remote.pushRepairRequest.mockImplementation(() => {
+      return new Promise<boolean>(resolve => { finish = resolve; });
     });
     const pending = store.submit();
     await vi.advanceTimersByTimeAsync(0);
     store.draft.problem = 'A newer edit that was not part of the submitted request.';
-    finish(record(snapshot));
+    finish(true);
     const submitted = await pending;
     expect(submitted.problem).toBe('The phone is not charging correctly.');
     expect(store.draft.problem).toContain('newer edit');

@@ -18,9 +18,9 @@
       <textarea :id="`reply-${review.id}`" v-model="replyText" :maxlength="MAX_REVIEW_LENGTH" rows="4" required :aria-describedby="`reply-count-${review.id}`" />
       <small :id="`reply-count-${review.id}`">{{ replyText.length }} / {{ MAX_REVIEW_LENGTH }} characters</small>
       <p v-if="error" role="alert" class="review-card__error">{{ error }}</p>
-      <div class="reply-form__actions"><button class="fx-btn fx-btn-primary" type="submit">Save reply</button><button class="fx-btn fx-btn-secondary" type="button" @click="editing = false">Cancel</button></div>
+       <div class="reply-form__actions"><button class="fx-btn fx-btn-primary" type="submit" :disabled="sending">{{ sending ? 'Sending…' : 'Send reply' }}</button><button class="fx-btn fx-btn-secondary" type="button" :disabled="sending" @click="editing = false">Cancel</button></div>
     </form>
-    <button v-else-if="canReply" class="fx-btn fx-btn-secondary reply-button" type="button" @click="openReply">{{ review.reply ? 'Edit reply' : 'Reply to review' }}</button>
+    <button v-else-if="canReply && (!review.reply || !review.synced)" class="fx-btn fx-btn-secondary reply-button" type="button" @click="openReply">{{ review.reply ? 'Edit reply' : 'Reply to review' }}</button>
     <p v-if="success" role="status" class="review-card__success">{{ success }}</p>
   </article>
 </template>
@@ -34,7 +34,7 @@ import { technicians } from '../../data/catalog';
 import { useReviews } from '../../stores/reviews';
 
 const props = defineProps<{ review: RepairReview; canReply?: boolean; showTechnician?: boolean }>();
-const { saveReply } = useReviews();
+const { saveReplyConfirmed } = useReviews();
 // Local reviews identify technicians by directory id, shared reviews by name from FIXHUB.
 const technicianName = computed(() => technicians.find(tech => tech.id === props.review.technicianId)?.name ?? props.review.technicianName);
 const initials = computed(() => props.review.customerName.split(/\s+/).map(part => part[0]).slice(0, 2).join(''));
@@ -42,6 +42,7 @@ const editing = ref(false);
 const replyText = ref('');
 const error = ref('');
 const success = ref('');
+const sending = ref(false);
 const formatDate = (date: string) => new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 function openReply() {
@@ -50,13 +51,16 @@ function openReply() {
   success.value = '';
   editing.value = true;
 }
-function submitReply() {
+async function submitReply() {
+  if (sending.value) return;
   error.value = '';
+  sending.value = true;
   try {
-    saveReply(props.review.id, replyText.value);
+    await saveReplyConfirmed(props.review.id, replyText.value);
     editing.value = false;
-    success.value = 'Your response was saved in this browser.';
+    success.value = 'Your response was sent to FIXHUB.';
   } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Your response could not be saved. Please try again.'; }
+  finally { sending.value = false; }
 }
 </script>
 

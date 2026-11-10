@@ -37,13 +37,12 @@ describe('repair request status presentation', () => {
     expect(remoteStatusLabel(remote)).toBe(label);
   });
 
-  test('colors pills by status and treats unsynced records as pending', () => {
+  test('colors only confirmed request status pills', () => {
     expect(statusPillClass({ status: 'Completed', synced: true })).toBe('fx-pill--completed');
     expect(statusPillClass({ status: 'Cancelled', synced: true })).toBe('fx-pill--danger');
     expect(statusPillClass({ status: 'Pending', synced: true })).toBe('fx-pill--progress');
     expect(statusPillClass({ status: 'In Progress', synced: true })).toBe('fx-pill--accent');
-    expect(statusPillClass({ status: 'Pending', synced: false })).toBe('fx-pill--pending');
-    expect(statusPillClass({ status: 'Pending' })).toBe('fx-pill--pending');
+    expect(statusPillClass({ status: 'Pending' })).toBe('fx-pill--progress');
   });
 
   test('offers exactly the next allowed workflow step for a technician', () => {
@@ -57,36 +56,31 @@ describe('repair request status presentation', () => {
   });
 });
 
-describe('local and shared repair request records', () => {
-  test('keeps a local-only request listed without claiming it was sent', () => {
-    const [merged] = mergeRepairRequests([record()], []);
-    expect(merged.id).toBe('req-1');
-    expect(merged.synced).toBeUndefined();
-    expect(merged.reference).toBe('FH-ABCDEF012345');
+describe('server-confirmed repair requests', () => {
+  test('does not show older browser-only requests as submitted', () => {
+    expect(mergeRepairRequests([record()], [])).toEqual([]);
   });
 
-  test('lets the backend lifecycle win while keeping local photos and identity', () => {
+  test('uses backend lifecycle and photos instead of stale browser copies', () => {
     const local = record({ status: 'Pending', photos: [{ id: 'p1', name: 'device.png', type: 'image/png', size: 3, blob: new Blob(['x'], { type: 'image/png' }) }] });
     const remote = record({ status: 'In Progress', updatedAt: '2026-11-02T00:00:00.000Z', synced: true, photos: [] });
     const [merged] = mergeRepairRequests([local], [remote]);
     expect(merged.status).toBe('In Progress');
     expect(merged.synced).toBe(true);
     expect(merged.updatedAt).toBe('2026-11-02T00:00:00.000Z');
-    expect(merged.photos).toHaveLength(1);
-    expect(merged.photos[0].name).toBe('device.png');
+    expect(merged.photos).toHaveLength(0);
   });
 
-  test('keeps requests that exist only on this device alongside shared ones, newest first', () => {
+  test('lists only server-confirmed requests', () => {
     const shared = record({ id: 'shared', createdAt: '2026-11-03T00:00:00.000Z', status: 'Accepted', synced: true });
     const localOnly = record({ id: 'local-only', createdAt: '2026-11-05T00:00:00.000Z' });
     const merged = mergeRepairRequests([localOnly, shared], [shared]);
-    expect(merged.map(request => request.id)).toEqual(['local-only', 'shared']);
-    expect(merged.find(request => request.id === 'local-only')?.synced).toBeUndefined();
+    expect(merged.map(request => request.id)).toEqual(['shared']);
     expect(merged.find(request => request.id === 'shared')?.status).toBe('Accepted');
   });
 
-  test('never breaks the local flow when no backend is configured', async () => {
+  test('does not mistake an unavailable backend for an empty history', async () => {
     await expect(pushRepairRequest(record(), 'client-1')).resolves.toBe(false);
-    await expect(fetchRemoteRepairRequests('client-1')).resolves.toEqual([]);
+    await expect(fetchRemoteRepairRequests('client-1')).rejects.toThrow();
   });
 });

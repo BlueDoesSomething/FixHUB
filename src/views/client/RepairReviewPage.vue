@@ -31,9 +31,9 @@
             </div>
             <aside class="fx-card submit-panel">
               <h2 class="fx-section-title">Before you submit</h2>
-              <p>No technician is assigned and no repair price has been agreed. Your request is saved on this device and sent to FIXHUB.</p>
+              <p>No technician is assigned and no repair price has been agreed. Your request is submitted only after FIXHUB confirms it.</p>
               <label class="consent"><input id="review-confirm" v-model="confirmed" type="checkbox" :disabled="state.submitting" />I have checked the device details, photos, service type, and location.</label>
-              <button class="fx-btn fx-btn-primary fx-btn--block" type="button" :disabled="!confirmed || !!Object.keys(errors).length || state.submitting" @click="submitRequest">{{ state.submitting ? 'Saving request…' : 'Submit Repair Request' }}</button>
+              <button class="fx-btn fx-btn-primary fx-btn--block" type="button" :disabled="!confirmed || !!Object.keys(errors).length || state.submitting" @click="submitRequest">{{ state.submitting ? 'Sending request…' : 'Submit Repair Request' }}</button>
               <p class="hint">You will receive a reference number and can reopen the request from Repair History. Nearby technicians can accept it — nothing is charged until a technician confirms the repair.</p>
             </aside>
           </div>
@@ -72,7 +72,7 @@ async function submitRequest() {
   try {
     const request = await submit();
     await router.replace({ name: 'client-request-details', params: { requestId: request.id }, query: { submitted: '1' } });
-  } catch { /* Saving failures are shown by the shared notice; no success screen. */ }
+  } catch { /* Submission failures are shown by the shared notice; no success screen. */ }
 }
 
 onMounted(initialize);

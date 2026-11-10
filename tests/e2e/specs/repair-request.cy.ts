@@ -1,5 +1,9 @@
 describe('repair request workflow', () => {
+  let failNextSubmit = false;
+  let failSubmissions = false;
   beforeEach(() => {
+    failNextSubmit = false;
+    failSubmissions = false;
     cy.intercept('https://tile.openstreetmap.org/**', { fixture: 'map-tile.svg', headers: { 'content-type': 'image/svg+xml' } });
     cy.visit('/');
     // Test browser storage only; no production Firebase project is involved.
@@ -10,6 +14,42 @@ describe('repair request workflow', () => {
       request.onblocked = () => reject(new Error('Test database is still in use.'));
     }));
     cy.signIn('client');
+    // The simulated backend is authoritative: a successful RPC creates a row,
+    // while a failed RPC must never create a submitted request in the UI.
+    const serverRows: Record<string, unknown>[] = [];
+    const serverPhotos: Record<string, unknown>[] = [];
+    cy.intercept('POST', '**/rest/v1/rpc/create_my_repair_request', req => {
+      if (failSubmissions || failNextSubmit) {
+        failNextSubmit = false;
+        req.reply({ statusCode: 503, body: { code: 'TEMP', message: 'Backend unavailable' } });
+        return;
+      }
+      const fields = req.body as Record<string, string | number>;
+      const id = String(fields.p_request_id);
+      if (!serverRows.some(row => row.id === id)) serverRows.push({
+        id, customer_id: '11111111-1111-4111-8111-111111111111',
+        reference: `FH-${id.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
+        device: fields.p_device, brand: fields.p_brand, model: fields.p_model,
+        problem: fields.p_problem, service_type: fields.p_service_type,
+        location: fields.p_location, latitude: fields.p_latitude, longitude: fields.p_longitude,
+        status: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      });
+      req.reply(JSON.stringify(id));
+    });
+    cy.intercept('GET', '**/rest/v1/repair_requests*', req => {
+      const id = new URL(req.url).searchParams.get('id')?.replace(/^eq\./, '');
+      if (id) req.reply({ body: serverRows.find(row => row.id === id) ?? 'null', headers: { 'content-type': 'application/json' } });
+      else req.reply(serverRows);
+    });
+    cy.intercept('POST', '**/rest/v1/repair_photos*', req => {
+      for (const row of req.body as Record<string, unknown>[]) serverPhotos.push({ id: crypto.randomUUID(), ...row });
+      req.reply({ statusCode: 201, body: [] });
+    });
+    cy.intercept('GET', '**/rest/v1/repair_photos*', req => { req.reply(serverPhotos); });
+    cy.intercept('POST', '**/storage/v1/object/sign/**', req => {
+      const paths = (Array.isArray(req.body) ? req.body : req.body.paths) as string[];
+      req.reply(paths.map(path => ({ path, signedURL: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==' })));
+    });
   });
 
   function fillDetails() {
@@ -116,7 +156,7 @@ describe('repair request workflow', () => {
     cy.get('#review-confirm').check();
     cy.contains('button', 'Submit Repair Request').click();
     cy.location('pathname').should('match', /^\/client\/requests\/[^/]+$/);
-    cy.contains('Request saved on this device').should('exist');
+    cy.contains('Request sent to FIXHUB').should('exist');
     cy.get('[data-testid="request-reference"]').invoke('text').then(reference => {
       cy.reload();
       cy.get('[data-testid="request-reference"]').should('have.text', reference);
@@ -125,7 +165,7 @@ describe('repair request workflow', () => {
       cy.get('[data-testid="saved-request"]').should('have.length', 1).and('contain', reference);
       cy.get('[data-testid="saved-request"]').contains('View Request').click();
       cy.get('[data-testid="request-reference"]').should('have.text', reference);
-      cy.contains('button', 'Start Another Request').click();
+      cy.get('.ion-page:not(.ion-page-hidden) button').contains('Start Another Request').click();
       cy.get('#repair-brand').should('have.value', '');
       cy.get('#repair-model').should('have.value', '');
       cy.get('#repair-problem').should('have.value', '');
@@ -141,8 +181,9 @@ describe('repair request workflow', () => {
     chooseLocation(true);
     cy.contains('Starting location').should('exist');
     cy.contains('not a confirmed shop address').should('exist');
-    cy.contains('button', 'Edit Details').click();
-    cy.get('#repair-model').clear().type('Galaxy Tab S9 FE');
+    cy.get('.ion-page:not(.ion-page-hidden) button').contains('Edit Details').click();
+    cy.location('pathname').should('eq', '/client/request');
+    cy.contains('button:visible', 'Save Draft').closest('form').find('#repair-model').scrollIntoView().clear().type('Galaxy Tab S9 FE');
     cy.contains('button', 'Continue to Location').click();
     cy.get('[data-testid="selected-coordinates"]').should('exist');
     cy.get('#service-address').should('have.value', 'Example building, Makati City');
@@ -151,7 +192,7 @@ describe('repair request workflow', () => {
     cy.get('#review-confirm').should('not.be.checked');
     cy.get('#review-confirm').check();
     cy.contains('button', 'Submit Repair Request').click();
-    cy.contains('Request saved on this device').should('exist');
+    cy.contains('Request sent to FIXHUB').should('exist');
     cy.contains('Drop-off').should('exist');
   });
 
@@ -175,7 +216,7 @@ describe('repair request workflow', () => {
     cy.get('[role="alert"]').should('contain', 'Could not save on this device');
     cy.location('pathname').should('eq', '/client/request');
     cy.get('#repair-model').should('have.value', 'Galaxy Tab S9');
-    cy.contains('Request saved on this device').should('not.exist');
+    cy.contains('Request sent to FIXHUB').should('not.exist');
   });
 
   it('direct review access cannot submit an incomplete draft', () => {
@@ -185,26 +226,50 @@ describe('repair request workflow', () => {
     cy.contains('button', 'Submit Repair Request').should('be.disabled');
   });
 
-  it('keeps the reviewed draft after a failed submission and saves once when retried', () => {
+  it('keeps the reviewed draft after a failed backend submission and sends once when retried', () => {
     cy.visit('/client/request');
     fillDetails();
     chooseLocation();
     cy.get('#review-confirm').check();
-    cy.window().then(win => {
-      const original = win.IDBObjectStore.prototype.add;
-      cy.stub(win.IDBObjectStore.prototype, 'add').callsFake(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
-        if (this.name === 'requests') throw new DOMException('Full', 'QuotaExceededError');
-        return key === undefined ? original.call(this, value) : original.call(this, value, key);
-      }).as('failedWrite');
-    });
+    failNextSubmit = true;
     cy.contains('button', 'Submit Repair Request').click();
-    cy.get('[role="alert"]').should('contain', 'device storage is full');
+    cy.get('[role="alert"]').should('contain', 'Could not send your repair request to FIXHUB');
     cy.location('pathname').should('eq', '/client/request/review');
     cy.contains('Galaxy Tab S9').should('exist');
-    cy.get('@failedWrite').then(stub => (stub as unknown as { restore: () => void }).restore());
+    cy.visit('/client/history');
+    cy.contains('No submitted requests yet').should('be.visible');
+    cy.visit('/client/request/review');
+    cy.get('#review-confirm').check();
     cy.contains('button', 'Submit Repair Request').click();
-    cy.contains('Request saved on this device').should('exist');
+    cy.contains('Request sent to FIXHUB').should('exist');
     cy.contains('button', 'View Repair History').click();
     cy.get('[data-testid="saved-request"]').should('have.length', 1);
+  });
+
+  it('never presents an older browser-only record as a submitted repair', () => {
+    failSubmissions = true;
+    cy.window().then(win => new Cypress.Promise<void>((resolve, reject) => {
+      const open = win.indexedDB.open('fixhub-repairs-v1');
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction('requests', 'readwrite');
+        tx.objectStore('requests').put({
+          id: 'fb4f41ce-e7e9-40d1-a3ac-6d0c32f35dd2', ownerId: '11111111-1111-4111-8111-111111111111',
+          reference: 'FH-FB4F41CEE7E9', device: 'Tablet', brand: 'Samsung', model: 'Galaxy',
+          problem: 'The tablet screen is broken.', serviceType: 'dropoff', location: 'Makati City',
+          coordinates: { lat: 14.6, lng: 121.0 }, photos: [], status: 'Pending', createdAt: new Date().toISOString(),
+        });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      };
+    }));
+    cy.visit('/client/history');
+    cy.get('[data-testid="saved-request"]').should('not.exist');
+    cy.contains('earlier request(s) could not be delivered to FIXHUB').should('be.visible');
+    cy.contains('No submitted requests yet').should('be.visible');
+    cy.visit('/client/requests/fb4f41ce-e7e9-40d1-a3ac-6d0c32f35dd2');
+    cy.contains('Request not found in FIXHUB').should('be.visible');
+    cy.contains('Pending · local').should('not.exist');
   });
 });

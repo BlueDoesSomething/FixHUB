@@ -54,6 +54,13 @@ export async function getRepairRequest(ownerId: string, id: string): Promise<Sub
   return record?.ownerId === ownerId ? record : null;
 }
 
+/** Retain legacy browser records safely while stopping repeated uploads after server confirmation. */
+export async function markRepairRequestSynced(ownerId: string, id: string) {
+  const database = await db();
+  const record = await database.get('requests', id);
+  if (record?.ownerId === ownerId) await database.put('requests', { ...record, synced: true, syncError: undefined });
+}
+
 /** Atomic save + draft reset. Repeating the same draft ID never creates a duplicate. */
 export async function submitRepairRequest(ownerId: string, draft: RepairDraft, nextDraft: RepairDraft): Promise<SubmittedRepairRequest> {
   if (Object.keys(validateRepair(draft)).length) throw new Error('Complete the required device details and location first.');

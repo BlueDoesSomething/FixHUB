@@ -4,7 +4,7 @@ import { devices } from './catalog';
 
 export type ServiceType = 'home' | 'dropoff';
 
-/** Lifecycle of a repair request. Local-only records stay 'Pending' until they sync. */
+/** Lifecycle of a request confirmed by FIXHUB. */
 export type RepairRequestStatus =
   | 'Pending'
   | 'Accepted'
@@ -31,7 +31,6 @@ export function remoteStatusLabel(status: string): RepairRequestStatus {
 
 /** Pill class for a request status (matches the fx-pill--* design system). */
 export function statusPillClass(request: Pick<SubmittedRepairRequest, 'status' | 'synced'>): string {
-  if (!request.synced) return 'fx-pill--pending';
   switch (request.status) {
     case 'Completed': return 'fx-pill--completed';
     case 'Cancelled': return 'fx-pill--danger';
