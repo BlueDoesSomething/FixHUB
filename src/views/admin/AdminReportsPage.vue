@@ -25,7 +25,7 @@
         <p v-if="loading" role="status">Loading Supabase reports…</p>
 
         <p v-if="!report" class="reports__error" role="alert">Choose a valid date to see reports.</p>
-        <template v-else>
+        <template v-else-if="!loading && !loadError">
           <p class="reports__range" role="status" data-testid="report-range">{{ report.range.label }} · {{ report.total }} completed {{ report.total === 1 ? 'repair' : 'repairs' }}</p>
           <div class="fx-stat-grid reports__stats">
             <div class="fx-stat">

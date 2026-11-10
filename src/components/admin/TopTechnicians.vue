@@ -31,7 +31,7 @@
         </dl>
       </li>
     </ol>
-    <p v-else class="top-techs__empty">No technicians qualify yet. Verified technicians need at least one review and one completed repair to appear here.</p>
+    <p v-else-if="!loading" class="top-techs__empty">No technicians qualify yet. Verified technicians need at least one review and one completed repair to appear here.</p>
 
     <details class="top-techs__method">
       <summary>How technicians are ranked</summary>
@@ -45,7 +45,7 @@ import InitialAvatar from '../InitialAvatar.vue';
 import { TECHNICIAN_RANKING_WEIGHTS } from '../../utils/technicianRanking';
 import type { Overview } from '../../services/adminAnalytics';
 
-defineProps<{ technicians: Overview['topTechnicians'] }>();
+defineProps<{ technicians: Overview['topTechnicians']; loading?: boolean }>();
 // Ranking and counts are aggregated by the admin-only Supabase RPC.
 </script>
 

@@ -60,11 +60,11 @@ as $$
 begin
   if not public.is_admin() then raise exception 'Admin access required.'; end if;
   return query
-  select id, applicant_id, full_name, email, contact_number, city,
-         years_experience, brands, specializations, experience_description,
-         service_type, coverage_area, working_days, working_hours,
-         status, created_at, updated_at, reviewer_id, reviewed_at, feedback
-  from public.technician_applications;
+   select a.id, a.applicant_id, a.full_name, a.email, a.contact_number, a.city,
+          a.years_experience, a.brands, a.specializations, a.experience_description,
+          a.service_type, a.coverage_area, a.working_days, a.working_hours,
+          a.status, a.created_at, a.updated_at, a.reviewer_id, a.reviewed_at, a.feedback
+   from public.technician_applications a;
 end;
 $$;
 
