@@ -59,6 +59,7 @@ import { useRoute, useRouter } from 'vue-router';
 import InitialAvatar from './InitialAvatar.vue';
 import type { NavItem } from '../data/navigation';
 import { useAuth } from '../stores/auth';
+import { backDestination } from '../utils/backNavigation';
 
 const props = defineProps<{ items: NavItem[]; role: string }>();
 const route = useRoute();
@@ -120,7 +121,7 @@ const title = computed(() => {
 const showBack = computed(() => !props.items.some((i) => route.path === i.route));
 
 function goBack() {
-  router.back();
+  void router.push(backDestination(route.path, props.role));
 }
 
 function goToProfile() {

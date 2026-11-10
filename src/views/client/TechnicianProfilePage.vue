@@ -4,7 +4,7 @@
       <div v-if="tech" class="fx-page">
         <section class="fx-hero">
           <div class="fx-hero-body profile-hero">
-            <button class="back" @click="router.back()">
+            <button class="back" type="button" aria-label="Go back" @click="router.push('/client/request/matching')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
             <div class="profile-hero__avatar">
@@ -47,7 +47,7 @@
           </aside>
         </div>
       </div>
-      <div v-else class="fx-page"><div class="fx-card"><h1 class="fx-page__title">Technician not found</h1><p>Select an available technician to view their profile.</p><button class="fx-btn fx-btn-secondary" @click="router.back()">Go Back</button></div></div>
+      <div v-else class="fx-page"><div class="fx-card"><h1 class="fx-page__title">Technician not found</h1><p>Select an available technician to view their profile.</p><button class="fx-btn fx-btn-secondary" @click="router.push('/client/request/matching')">Go Back</button></div></div>
     </ion-content>
   </ion-page>
 </template>

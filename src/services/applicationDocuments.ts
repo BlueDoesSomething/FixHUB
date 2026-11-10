@@ -11,8 +11,8 @@ export async function uploadApplicationDocuments(userId: string, applicationId: 
   for (const [index, file] of files.entries()) {
     const name = `${index}--${encodeURIComponent(file.name)}`;
     if (existing?.some(saved => saved.name === name)) continue;
-    const [prefix, base64] = file.dataUrl.split(',', 2);
-    if (!prefix?.startsWith('data:') || !base64) throw new Error('Invalid application document.');
+    const [dataHeader, base64] = file.dataUrl.split(',', 2);
+    if (!dataHeader?.startsWith('data:') || !base64) throw new Error('Invalid application document.');
     const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
     const { error } = await storage.upload(`${prefix}/${name}`, bytes, { contentType: file.type, upsert: false });
     if (error) throw error;

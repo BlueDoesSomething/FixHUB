@@ -42,13 +42,22 @@ describe('repair request workflow', () => {
       else req.reply(serverRows);
     });
     cy.intercept('POST', '**/rest/v1/repair_photos*', req => {
-      for (const row of req.body as Record<string, unknown>[]) serverPhotos.push({ id: crypto.randomUUID(), ...row });
+      const rows = (Array.isArray(req.body) ? req.body : [req.body]) as Record<string, unknown>[];
+      for (const row of rows) serverPhotos.push({ id: crypto.randomUUID(), ...row });
       req.reply({ statusCode: 201, body: [] });
     });
-    cy.intercept('GET', '**/rest/v1/repair_photos*', req => { req.reply(serverPhotos); });
+    cy.intercept('GET', '**/rest/v1/repair_photos*', req => {
+      const params = new URL(req.url).searchParams;
+      const position = params.get('position')?.replace(/^eq\./, '');
+      const rows = position === undefined ? serverPhotos : serverPhotos.filter(row => String(row.position) === position);
+      req.reply(params.has('position') ? { body: rows[0] ?? 'null', headers: { 'content-type': 'application/json' } } : rows);
+    });
     cy.intercept('POST', '**/storage/v1/object/sign/**', req => {
       const paths = (Array.isArray(req.body) ? req.body : req.body.paths) as string[];
-      req.reply(paths.map(path => ({ path, signedURL: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==' })));
+      req.reply(paths.map(path => ({ path, signedURL: `/object/sign/repair-photos/${path}?token=fixture` })));
+    });
+    cy.intercept('GET', '**/storage/v1/object/sign/repair-photos/**', {
+      fixture: 'map-tile.svg', headers: { 'content-type': 'image/svg+xml' },
     });
   });
 
@@ -164,8 +173,9 @@ describe('repair request workflow', () => {
       cy.contains('button', 'View Repair History').click();
       cy.get('[data-testid="saved-request"]').should('have.length', 1).and('contain', reference);
       cy.get('[data-testid="saved-request"]').contains('View Request').click();
+      cy.location('pathname').then(path => cy.visit(path));
       cy.get('[data-testid="request-reference"]').should('have.text', reference);
-      cy.get('.ion-page:not(.ion-page-hidden) button').contains('Start Another Request').click();
+      cy.contains('button', 'Start Another Request').click();
       cy.get('#repair-brand').should('have.value', '');
       cy.get('#repair-model').should('have.value', '');
       cy.get('#repair-problem').should('have.value', '');
@@ -183,7 +193,7 @@ describe('repair request workflow', () => {
     cy.contains('not a confirmed shop address').should('exist');
     cy.get('.ion-page:not(.ion-page-hidden) button').contains('Edit Details').click();
     cy.location('pathname').should('eq', '/client/request');
-    cy.contains('button:visible', 'Save Draft').closest('form').find('#repair-model').scrollIntoView().clear().type('Galaxy Tab S9 FE');
+    cy.get('.ion-page:not(.ion-page-hidden) form #repair-model').scrollIntoView().clear().type('Galaxy Tab S9 FE');
     cy.contains('button', 'Continue to Location').click();
     cy.get('[data-testid="selected-coordinates"]').should('exist');
     cy.get('#service-address').should('have.value', 'Example building, Makati City');
@@ -244,6 +254,35 @@ describe('repair request workflow', () => {
     cy.contains('Request sent to FIXHUB').should('exist');
     cy.contains('button', 'View Repair History').click();
     cy.get('[data-testid="saved-request"]').should('have.length', 1);
+  });
+
+  it('does not claim photos are saved if Storage fails and retries the same repair without losing the image', () => {
+    let failUpload = true;
+    cy.intercept('POST', '**/storage/v1/object/repair-photos/**', req => {
+      expect(req.headers['x-upsert']).not.to.eq('true');
+      req.reply(failUpload
+        ? { statusCode: 403, body: { message: 'Storage unavailable' } }
+        : { statusCode: 200, body: { Key: req.url } });
+    }).as('photoUpload');
+    cy.visit('/client/request');
+    fillDetails();
+    attachPhoto();
+    chooseLocation();
+    cy.get('#review-confirm').check();
+    cy.contains('button', 'Submit Repair Request').click();
+    cy.get('[role="alert"]').should('contain', 'photos could not be saved');
+    cy.location('pathname').should('eq', '/client/request/review');
+    cy.visit('/client/request');
+    cy.contains('1 of 3 photos attached').should('exist');
+    cy.visit('/client/request/review');
+    cy.then(() => { failUpload = false; });
+    cy.get('#review-confirm').check();
+    cy.contains('button', 'Submit Repair Request').click();
+    cy.contains('Request sent to FIXHUB').should('be.visible');
+    cy.get('.photo-grid img[alt="device.png"]').should('be.visible').and($image => { expect(($image[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0); });
+    cy.reload();
+    cy.get('.photo-grid img[alt="device.png"]').should('be.visible').and($image => { expect(($image[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0); });
+    cy.get('@photoUpload.all').should('have.length', 2);
   });
 
   it('never presents an older browser-only record as a submitted repair', () => {

@@ -1,7 +1,7 @@
 import { reactive, watch } from 'vue';
 import { emptyRepairDraft, snapshotRepair, validateRepair, type SubmittedRepairRequest } from '../data/repair';
 import { listRepairRequests, loadRepairDraft, markRepairRequestSynced, repairStorageMessage, saveRepairDraft } from '../services/repairStorage';
-import { fetchRemoteRepairRequests, mergeRepairRequests, pushRepairRequest } from '../services/repairSync';
+import { fetchRemoteRepairRequests, mergeRepairRequests, pushRepairRequest, RepairPhotoUploadError } from '../services/repairSync';
 import { isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from './auth';
 
@@ -73,9 +73,14 @@ async function publishPending(ownerId: string, records: SubmittedRepairRequest[]
   let failed = 0;
   for (const request of records.filter(item => !item.synced)) {
     if (auth.state.session?.userId !== ownerId) return failed;
-    if (await pushRepairRequest(request, ownerId)) {
-      await markRepairRequestSynced(ownerId, request.id).catch(() => undefined);
-    } else failed++;
+    try {
+      if (await pushRepairRequest(request, ownerId)) {
+        await markRepairRequestSynced(ownerId, request.id).catch(() => undefined);
+      } else failed++;
+    } catch (error) {
+      if (error instanceof RepairPhotoUploadError) failed++;
+      else throw error;
+    }
   }
   return failed;
 }

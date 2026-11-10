@@ -16,10 +16,16 @@ type RepairPhotoRow = Database['public']['Tables']['repair_photos']['Row'];
 
 type Backend = ReturnType<typeof getSupabaseBackend>;
 
+/** The repair exists in FIXHUB, but attached photos still need to be delivered. */
+export class RepairPhotoUploadError extends Error {
+  constructor() { super('Your repair request reached FIXHUB, but its photos could not be saved. Your draft and photos are still on this device; check your connection and submit again to retry.'); }
+}
+
 /** Push one local record to the backend. Resolves false when it is still local-only. */
 export async function pushRepairRequest(record: SubmittedRepairRequest, ownerId: string): Promise<boolean> {
+  let backend: Backend;
   try {
-    const backend = getSupabaseBackend();
+    backend = getSupabaseBackend();
     const { error } = await backend.rpc('create_my_repair_request', {
       p_device: record.device,
       p_brand: record.brand,
@@ -36,35 +42,56 @@ export async function pushRepairRequest(record: SubmittedRepairRequest, ownerId:
       const { data: existing } = await backend.from('repair_requests').select('id').eq('id', record.id).maybeSingle();
       if (!existing) return false;
     }
-    await uploadRepairPhotos(backend, record, ownerId);
-    return true;
   } catch {
     return false;
   }
+  await uploadRepairPhotos(backend, record, ownerId);
+  return true;
 }
 
 async function uploadRepairPhotos(backend: Backend, record: SubmittedRepairRequest, ownerId: string) {
   if (!record.photos.length) return;
   try {
-    const rows: Database['public']['Tables']['repair_photos']['Insert'][] = [];
+    const { data: existing, error: readError } = await backend.from('repair_photos')
+      .select('position,storage_path').eq('repair_id', record.id);
+    if (readError) throw readError;
+    const storage = backend.storage.from(PHOTO_BUCKET);
     for (const [position, photo] of record.photos.entries()) {
       const safeName = photo.name.replace(/[^\w.-]+/g, '_').slice(-80) || 'photo';
-      const storagePath = `${ownerId}/${record.id}/${position}-${safeName}`;
-      const { error } = await backend.storage.from(PHOTO_BUCKET)
-        .upload(storagePath, photo.blob, { contentType: photo.type, upsert: true });
-      if (error) continue; // The request still syncs; missing photos stay on this device.
-      rows.push({
+      const fileName = `${position}-${safeName}`;
+      const storagePath = `${ownerId}/${record.id}/${fileName}`;
+      const saved = existing?.find(row => row.position === position);
+      if (saved) {
+        if (saved.storage_path !== storagePath) throw new Error('A different photo already occupies this position.');
+        continue;
+      }
+      // The Storage policy allows inserts, not overwrites. A retry can reuse an
+      // object from an earlier attempt whose metadata insert did not complete.
+      const { error: uploadError } = await storage.upload(storagePath, photo.blob, { contentType: photo.type, upsert: false });
+      if (uploadError) {
+        // Only a duplicate-object conflict can mean an earlier attempt saved
+        // this photo. A permission or network failure must never count as saved.
+        if (uploadError.status !== 409) throw uploadError;
+        const { data: files, error: listError } = await storage.list(`${ownerId}/${record.id}`, { limit: 100 });
+        if (listError || !files?.some(file => file.name === fileName)) throw uploadError;
+      }
+      const row: Database['public']['Tables']['repair_photos']['Insert'] = {
         repair_id: record.id,
         storage_path: storagePath,
         file_name: photo.name.slice(0, 255),
         content_type: photo.type || 'image/jpeg',
         file_size: photo.size,
         position,
-      });
+      };
+      const { error: insertError } = await backend.from('repair_photos').insert(row);
+      if (insertError) {
+        const { data: confirmed } = await backend.from('repair_photos')
+          .select('storage_path').eq('repair_id', record.id).eq('position', position).maybeSingle();
+        if (confirmed?.storage_path !== storagePath) throw insertError;
+      }
     }
-    if (rows.length) await backend.from('repair_photos').insert(rows);
   } catch {
-    // Photo upload is supplementary; never fail the request sync because of it.
+    throw new RepairPhotoUploadError();
   }
 }
 
