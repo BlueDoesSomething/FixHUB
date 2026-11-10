@@ -26,9 +26,12 @@
     <p class="location-picker__hint" role="status">{{ running ? 'Following device location while this map is open. Choosing a pin stops GPS updates.' : 'Manual location. Use your current location to resume GPS updates.' }}</p>
     <p v-if="gpsError" class="location-picker__error" role="alert">{{ gpsError }}</p>
     <div class="location-picker__selection" aria-live="polite">
-      <p v-if="modelValue" data-testid="selected-coordinates">Selected: {{ formatCoordinates(modelValue) }}</p>
+      <p v-if="modelValue" data-testid="selected-coordinates">
+        <span v-if="address" class="location-picker__place">{{ address }}</span>
+        <span v-if="address" class="location-picker__coords">{{ formatCoordinates(modelValue) }}</span>
+        <span v-if="!address">{{ formatCoordinates(modelValue) }}</span>
+      </p>
       <p v-else>No location selected. Search for an address, use GPS, or place a pin.</p>
-      <p v-if="modelValue && address">{{ address }}</p>
       <p v-if="accuracy !== null">GPS accuracy: approximately ±{{ Math.round(accuracy) }} m. Adjust the pin if needed.</p>
     </div>
   </div>
@@ -83,7 +86,7 @@ function stopFollowing() { gps.stop(); hasGpsSelection = false; accuracy.value =
 
 const markers = computed<MapMarker[]>(() => [
   ...props.extraMarkers,
-  ...(props.modelValue ? [{ ...props.modelValue, id: 'selected-location', kind: 'dest' as const, label: 'You', title: 'Your selected location', draggable: true }] : []),
+  ...(props.modelValue ? [{ ...props.modelValue, id: 'selected-location', kind: 'dest' as const, label: 'You', title: props.address || 'Your location', draggable: true }] : []),
 ]);
 
 function cancelPending() {
@@ -146,6 +149,8 @@ defineExpose({ resize: () => mapRef.value?.resize(), cancelPending: () => { canc
 .location-picker__hint { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
 .location-picker__selection { padding: 12px 14px; background: var(--primary-light); color: var(--primary-dark); border-radius: 12px; font-size: 13px; }
 .location-picker__selection p { margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.location-picker__place { display: block; font-weight: 600; color: var(--text-dark); }
+.location-picker__coords { display: block; font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .location-picker__error { margin: 0; padding: 12px; border-radius: 10px; background: #fef2f2; color: #b91c1c; font-size: 13px; }
 .location-picker__results { list-style: none; margin: 0; padding: 0; border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
 .location-picker__results button { width: 100%; padding: 12px; text-align: left; font: inherit; font-size: 13px; color: var(--text-dark); background: var(--surface, #fff); border: 0; cursor: pointer; }

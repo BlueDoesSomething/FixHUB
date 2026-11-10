@@ -45,7 +45,7 @@
             <h2 class="fx-section-title">{{ isHome ? 'Service address' : 'Your starting point' }}</h2>
             <div class="location-selection" aria-live="polite">
               <template v-if="selected">
-                <strong>Location selected</strong>
+                <strong>{{ address || 'Location selected' }}</strong>
                 <p data-testid="selected-coordinates">{{ formatCoordinates(selected) }}</p>
                 <p v-if="accuracy !== null" class="location-accuracy">GPS accuracy: approximately ±{{ Math.round(accuracy) }} m. Adjust the pin if needed.</p>
               </template>
