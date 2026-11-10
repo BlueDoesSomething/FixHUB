@@ -33,7 +33,7 @@
             @accept="accept"
           />
         </div>
-        <p v-else-if="!loading && !error" class="empty">No new requests right now.</p>
+        <p v-else-if="!loading && !error" class="empty">No new requests right now. Customers must submit a repair request to FIXHUB before it appears here; sharing your map location alone does not create a job.</p>
       </div>
     </ion-content>
   </ion-page>
@@ -57,11 +57,12 @@ async function refresh() {
   loading.value = !jobs.value.length;
   error.value = '';
   notice.value = '';
-  const available = await fetchAvailableRepairs();
-  if (available === null) {
-    error.value = 'FIXHUB could not be reached. Check the connection and try again.';
-  } else {
-    jobs.value = available;
+  try {
+    jobs.value = await fetchAvailableRepairs();
+  } catch (cause) {
+    jobs.value = [];
+    error.value = cause && typeof cause === 'object' && 'message' in cause && typeof cause.message === 'string'
+      ? cause.message : 'FIXHUB could not be reached. Check the connection and try again.';
   }
   loading.value = false;
 }
@@ -91,4 +92,5 @@ onIonViewWillEnter(() => { void refresh(); });
 <style scoped>
 .requests-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .requests-notice { margin: 0 0 16px; padding: 12px 16px; border-radius: 12px; background: var(--gradient-soft); color: var(--primary); font-size: 14px; }
+.empty { color: var(--text-dark); line-height: 1.7; }
 </style>

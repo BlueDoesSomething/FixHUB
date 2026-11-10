@@ -6,21 +6,19 @@ import { remoteStatusLabel, type AssignedRepairJob, type AvailableRepairJob } fr
  * The technician job queue: pending repairs anyone can accept, and the repairs
  * assigned to the signed-in technician with their workflow status.
  *
- * Every function is best-effort — a backend problem shows an inline message
- * instead of breaking the dashboard.
+ * Backend problems show an inline message instead of breaking the dashboard.
  */
 
 type AvailableRow = Database['public']['Functions']['list_available_repairs']['Returns'][number];
 type AssignedRow = Database['public']['Functions']['list_my_assigned_repairs']['Returns'][number];
 
-/** Pending, unassigned repair requests, newest first. Null when the read failed. */
-export async function fetchAvailableRepairs(): Promise<AvailableRepairJob[] | null> {
-  try {
-    const backend = getSupabaseBackend();
-    const { data, error } = await backend.rpc('list_available_repairs');
-    if (error) return null;
-    if (!Array.isArray(data)) return [];
-    return (data as AvailableRow[]).map(row => ({
+/** Pending, unassigned repair requests, newest first. Errors include profile/access failures. */
+export async function fetchAvailableRepairs(): Promise<AvailableRepairJob[]> {
+  const backend = getSupabaseBackend();
+  const { data, error } = await backend.rpc('list_available_repairs');
+  if (error) throw error;
+  if (!Array.isArray(data)) return [];
+  return (data as AvailableRow[]).map(row => ({
       id: row.id,
       reference: row.reference,
       device: row.device,
@@ -32,10 +30,7 @@ export async function fetchAvailableRepairs(): Promise<AvailableRepairJob[] | nu
       latitude: row.latitude ?? null,
       longitude: row.longitude ?? null,
       createdAt: row.created_at,
-    }));
-  } catch {
-    return null;
-  }
+  }));
 }
 
 /** Takes ownership of a pending job. Resolves false when it was already taken. */
