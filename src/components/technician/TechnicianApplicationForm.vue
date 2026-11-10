@@ -204,6 +204,7 @@
           Submit Application <i data-lucide="send" class="btn-ico"></i>
         </button>
       </div>
+      <p v-if="submitError" class="err" role="alert">{{ submitError }}</p>
     </div>
 
     <transition name="overlay-fade">
@@ -252,11 +253,12 @@ import {
   type TechnicianApplicationPayload,
   type UploadedFile,
 } from '../../data/technicianApplication';
-import { useTechnicianApplications } from '../../stores/technicianApplications';
 import {
   submitApplication,
   type ApplicationSubmission,
 } from '../../services/technicianApplications';
+import { uploadApplicationDocuments } from '../../services/applicationDocuments';
+import { useAuth } from '../../stores/auth';
 
 const props = defineProps<{
   existing?: TechnicianApplication | null;
@@ -270,13 +272,13 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
-const store = useTechnicianApplications();
 const step = ref(0);
 const errors = reactive<Record<string, string>>({});
 const fileError = ref('');
 const showConfirm = ref(false);
 const submitting = ref(false);
-const supabaseAppId = ref<string | null>(null);
+const submitError = ref('');
+const submittedId = ref<string | null>(null);
 
 const form = reactive<ApplicationFormState>(emptyApplicationForm());
 
@@ -297,8 +299,9 @@ function hydrate() {
     form.coverageArea = props.existing.service.coverageArea;
     form.workingDays = [...props.existing.service.workingDays];
     form.workingHours = props.existing.service.workingHours;
-    form.certificates = [...props.existing.documents.certificates];
-    form.workPhotos = [...props.existing.documents.workPhotos];
+    // A resubmission is a new application: signed URLs cannot be uploaded as files.
+    form.certificates = [];
+    form.workPhotos = [];
   } else {
     form.fullName = props.profileName ?? '';
     form.email = props.profileEmail ?? '';
@@ -449,13 +452,9 @@ const SERVICE_TYPE_TO_DB: Record<string, ApplicationSubmission['p_service_type']
 async function confirmSubmit() {
   showConfirm.value = false;
   submitting.value = true;
-  await new Promise((resolve) => setTimeout(resolve, 700));
+  submitError.value = '';
   const payload = buildPayload();
-  const app = props.existing ? store.resubmit(props.existing.id, payload) : store.submit(payload);
-  submitting.value = false;
-  if (app) {
-    // Also submit to Supabase so admin approval and technician profiles work server-side.
-    try {
+  try {
       const dbPayload: ApplicationSubmission = {
         p_full_name: payload.applicant.fullName,
         p_contact_number: payload.applicant.contactNumber,
@@ -469,17 +468,19 @@ async function confirmSubmit() {
         p_working_days: payload.service.workingDays,
         p_working_hours: payload.service.workingHours,
       };
-      const supabaseId = await submitApplication(dbPayload);
-      supabaseAppId.value = supabaseId;
-      // Keep the local record's ID in sync with Supabase so lookups match.
-      app.id = supabaseId;
-    } catch {
-      // Supabase may not be configured yet; localStorage submission still works.
-      supabaseAppId.value = app.id;
-    }
-    emit('submitted', supabaseAppId.value ?? app.id);
+    const id = submittedId.value ?? await submitApplication(dbPayload, props.existing?.status === 'Rejected' ? undefined : props.existing?.id);
+    submittedId.value = id;
+    const userId = useAuth().state.session?.userId;
+    if (!userId) throw new Error('Sign in to upload application documents.');
+    await uploadApplicationDocuments(userId, id, [...payload.documents.certificates, ...payload.documents.workPhotos]);
+    submittedId.value = null;
+    emit('submitted', id);
     step.value = 0;
     hydrate();
+  } catch (cause) {
+    submitError.value = cause instanceof Error ? cause.message : 'Unable to submit application to Supabase.';
+  } finally {
+    submitting.value = false;
   }
 }
 

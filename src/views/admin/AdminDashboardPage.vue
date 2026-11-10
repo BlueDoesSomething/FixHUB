@@ -18,28 +18,28 @@
             <div class="fx-stat__icon fx-stat__icon--blue">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
             </div>
-            <p class="fx-stat__value">—</p>
+            <p class="fx-stat__value">{{ overview?.users ?? '—' }}</p>
             <p class="fx-stat__label">Total Users</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--teal">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6" /></svg>
             </div>
-            <p class="fx-stat__value">—</p>
+            <p class="fx-stat__value">{{ overview?.technicians ?? '—' }}</p>
             <p class="fx-stat__label">Technicians</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--orange">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             </div>
-            <p class="fx-stat__value">—</p>
+            <p class="fx-stat__value">{{ overview?.activeRepairs ?? '—' }}</p>
             <p class="fx-stat__label">Active Repairs</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--green">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
-            <p class="fx-stat__value">—</p>
+            <p class="fx-stat__value">{{ overview?.completed ?? '—' }}</p>
             <p class="fx-stat__label">Completed</p>
           </div>
           <div class="fx-stat">
@@ -51,17 +51,30 @@
           </div>
         </div>
 
-        <TopTechnicians class="dashboard__section" />
+        <p v-if="error" role="alert">{{ error }}</p>
+        <TopTechnicians class="dashboard__section" :technicians="overview?.topTechnicians ?? []" />
 
         <div class="fx-grid-2 dashboard__section">
           <div class="fx-card">
             <h4 class="chart-title">Weekly Repairs</h4>
-            <p class="apps-empty">No repair activity available.</p>
+            <div v-if="overview?.weekly.some(day => day.total)" class="weekly-chart">
+              <div v-for="day in overview.weekly" :key="day.day" class="weekly-chart__day">
+                <strong>{{ day.total }}</strong>
+                <div class="weekly-chart__bar" :style="{ height: `${Math.max(8, day.total / weeklyMax * 100)}%` }" />
+                <span>{{ day.day.slice(5) }}</span>
+              </div>
+            </div>
+            <p v-else class="apps-empty">No repair activity available.</p>
           </div>
 
           <div class="fx-table">
             <h4 class="fx-table__title">Recent Requests</h4>
-            <p class="apps-empty">No requests available.</p>
+            <p v-if="!overview?.recent.length" class="apps-empty">No requests available.</p>
+            <div v-for="request in overview?.recent ?? []" :key="request.id" class="fx-table__row">
+              <div class="fx-table__info"><p class="fx-table__name">{{ request.brand }} {{ request.device }}</p>
+                <p class="fx-table__sub">{{ request.reference }} · {{ request.customer }} · {{ new Date(request.createdAt).toLocaleDateString('en-PH') }}</p></div>
+              <span class="fx-pill">{{ request.status.replaceAll('_', ' ') }}</span>
+            </div>
           </div>
         </div>
 
@@ -84,27 +97,38 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import InitialAvatar from '../../components/InitialAvatar.vue';
 import TopTechnicians from '../../components/admin/TopTechnicians.vue';
 import { STATUS_META, initialsOf } from '../../data/technicianApplication';
-import { useTechnicianApplications } from '../../stores/technicianApplications';
+import { fetchAdminApplications, fetchOverview, type Overview } from '../../services/adminAnalytics';
+import type { TechnicianApplication } from '../../data/technicianApplication';
 import { useAuth } from '../../stores/auth';
 
 const router = useRouter();
-const applications = useTechnicianApplications();
+const overview = ref<Overview | null>(null);
+const applications = ref<TechnicianApplication[]>([]);
+const error = ref('');
 const profile = computed(() => useAuth().profile());
+const weeklyMax = computed(() => Math.max(1, ...(overview.value?.weekly.map(day => day.total) ?? [])));
+
+onMounted(async () => {
+  const [summary, apps] = await Promise.allSettled([fetchOverview(), fetchAdminApplications()]);
+  if (summary.status === 'fulfilled') overview.value = summary.value;
+  else error.value = 'Unable to load dashboard from Supabase.';
+  if (apps.status === 'fulfilled') applications.value = apps.value;
+  else error.value = 'Unable to load applications from Supabase.';
+});
 
 const pendingApps = computed(() =>
-  applications
-    .all()
+  applications.value
     .filter((a) => a.status === 'Pending' || a.status === 'Under Review')
     .slice(0, 4),
 );
 const pendingCount = computed(
-  () => applications.all().filter((a) => a.status === 'Pending' || a.status === 'Under Review').length,
+  () => overview.value?.applications ?? 0,
 );
 </script>
 
@@ -122,6 +146,9 @@ const pendingCount = computed(
 
 .chart-title { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; color: var(--text-dark); margin: 0 0 16px; }
 .chart-title span { color: var(--success); font-size: 13px; font-weight: 700; }
+.weekly-chart { display: flex; gap: 8px; height: 165px; align-items: end; }
+.weekly-chart__day { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: end; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.weekly-chart__bar { width: 100%; max-width: 40px; min-height: 8px; background: var(--primary); border-radius: 4px 4px 0 0; }
 
 @media (max-width: 767px) {
   .hero { gap: 16px; align-items: flex-start; }

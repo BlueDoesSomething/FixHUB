@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { technicians, newRequests } from '@/data/catalog';
 import { technicians as landingTechnicians } from '@/data/landing/technicians';
-import { reportRepairs } from '@/data/reports';
 import { completedReviewRepairs, REVIEW_STORAGE_KEY } from '@/data/reviews';
 import { createReviewsStore } from '@/stores/reviews';
 import { useAuth } from '@/stores/auth';
@@ -10,7 +9,7 @@ beforeEach(() => { localStorage.clear(); });
 
 describe('no runtime example records', () => {
   test('does not populate directories, reports, requests, or eligible review repairs', () => {
-    for (const collection of [technicians, newRequests, landingTechnicians, reportRepairs, completedReviewRepairs]) expect(collection).toEqual([]);
+    for (const collection of [technicians, newRequests, landingTechnicians, completedReviewRepairs]) expect(collection).toEqual([]);
   });
 
   test('starts with empty reviews rather than a seeded collection', () => {

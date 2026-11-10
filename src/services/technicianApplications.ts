@@ -19,6 +19,13 @@ export async function fetchTechnicianApplications(): Promise<TechnicianApplicati
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) as TechnicianApplicationRow[];
 }
 
+export async function fetchMyTechnicianApplications(userId: string): Promise<TechnicianApplicationRow[]> {
+  const { data, error } = await getSupabaseBackend().from('technician_applications')
+    .select('*').eq('applicant_id', userId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function approveApplication(applicationId: string): Promise<void> {
   const { error } = await getSupabaseBackend().rpc('admin_approve_application', {
     p_application_id: applicationId,
@@ -63,7 +70,19 @@ export type ApplicationSubmission = {
   p_working_hours: string;
 };
 
-export async function submitApplication(payload: ApplicationSubmission): Promise<string> {
+export async function submitApplication(payload: ApplicationSubmission, existingId?: string): Promise<string> {
+  if (existingId) {
+    const { data, error } = await getSupabaseBackend().from('technician_applications').update({
+      full_name: payload.p_full_name, contact_number: payload.p_contact_number,
+      city: payload.p_city, years_experience: payload.p_years_experience,
+      brands: payload.p_brands, specializations: payload.p_specializations,
+      experience_description: payload.p_experience_description,
+      service_type: payload.p_service_type, coverage_area: payload.p_coverage_area,
+      working_days: payload.p_working_days, working_hours: payload.p_working_hours,
+    }).eq('id', existingId).select('id').single();
+    if (error) throw error;
+    return data.id;
+  }
   const { data, error } = await getSupabaseBackend().rpc('submit_my_application', payload);
   if (error) throw error;
   return data as string;

@@ -1,14 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { mount, type VueWrapper } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import AdminReportsPage from '@/views/admin/AdminReportsPage.vue';
 import DonutChart from '@/components/DonutChart.vue';
 import BarChart from '@/components/BarChart.vue';
+import { reportRepairs } from './fixtures/reports';
 
 vi.mock('@ionic/vue', () => ({ IonPage: { template: '<div><slot /></div>' }, IonContent: { template: '<div><slot /></div>' } }));
-vi.mock('@/data/reports', async importOriginal => ({
-  ...await importOriginal<typeof import('@/data/reports')>(),
-  reportRepairs: (await import('./fixtures/reports')).reportRepairs,
-}));
+vi.mock('@/services/adminAnalytics', () => ({ fetchReportRepairs: async () => reportRepairs }));
 let wrapper: VueWrapper | undefined;
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-31T10:00:00+08:00')); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.useRealTimers(); });
@@ -18,8 +16,9 @@ function render() {
 }
 
 describe('admin report filters', () => {
-  test('starts with the current month and shows a labeled brand donut for supplied records', () => {
+  test('starts with the current month and shows a labeled brand donut for supplied records', async () => {
     render();
+    await flushPromises();
     expect(wrapper!.get('[data-period="month"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper!.get('[data-testid="report-range"]').text()).toContain('October 2026');
     expect(wrapper!.get('[data-testid="report-total"]').text()).toBe('21');
@@ -29,24 +28,25 @@ describe('admin report filters', () => {
     expect(wrapper!.text()).not.toMatch(/demo|sample|illustrative/i);
   });
 
-  test('updates totals, revenue, the donut, and service bars with every period selection', async () => {
+  test('updates totals, the donut, and service bars with every period selection', async () => {
     render();
-    const initialRevenue = wrapper!.get('[data-testid="report-revenue"]').text();
+    await flushPromises();
     for (const [period, count] of [['day', 4], ['week', 11], ['month', 21], ['year', 27]] as const) {
       await wrapper!.get(`[data-period="${period}"]`).trigger('click');
+      await flushPromises();
       expect(wrapper!.get(`[data-period="${period}"]`).attributes('aria-pressed')).toBe('true');
       expect(wrapper!.findAll('[aria-pressed="true"]')).toHaveLength(1);
       expect(wrapper!.get('[data-testid="report-total"]').text()).toBe(String(count));
       expect(wrapper!.get('[data-testid="brand-donut"] .donut-chart__center strong').text()).toBe(String(count));
       const services = wrapper!.findComponent(BarChart).props('data');
       expect(services.reduce((sum: number, service: { value: number }) => sum + service.value, 0)).toBe(count);
-      if (period === 'day') expect(wrapper!.get('[data-testid="report-revenue"]').text()).not.toBe(initialRevenue);
     }
   });
 
   test('filters by the reference date and displays a single-brand period accurately', async () => {
     render();
     await wrapper!.get('#report-date').setValue('2025-12-31');
+    await flushPromises();
     expect(wrapper!.get('[data-testid="report-total"]').text()).toBe('1');
     expect(wrapper!.get('[data-testid="report-range"]').text()).toContain('December 2025');
     expect(wrapper!.findAll('.donut-chart__segment')).toHaveLength(1);
@@ -57,6 +57,7 @@ describe('admin report filters', () => {
   test('shows zero totals and empty charts for a period with no completed repairs', async () => {
     render();
     await wrapper!.get('#report-date').setValue('2030-01-01');
+    await flushPromises();
     expect(wrapper!.get('[data-testid="report-total"]').text()).toBe('0');
     expect(wrapper!.findAll('.donut-chart__segment')).toHaveLength(0);
     expect(wrapper!.findComponent(BarChart).exists()).toBe(false);
@@ -72,6 +73,7 @@ describe('admin report filters', () => {
     expect(wrapper!.find('[data-testid="report-total"]').exists()).toBe(false);
     expect(wrapper!.findComponent(DonutChart).exists()).toBe(false);
     await wrapper!.get('#report-date').setValue('2026-10-31');
+    await flushPromises();
     expect(wrapper!.find('[role="alert"]').exists()).toBe(false);
     expect(wrapper!.get('[data-testid="report-total"]').text()).toBe('21');
   });

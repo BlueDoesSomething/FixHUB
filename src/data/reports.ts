@@ -16,4 +16,3 @@ export const REPORT_PERIODS: { value: ReportPeriod; label: string }[] = [
   { value: 'year', label: 'Yearly' },
 ];
 export const REPORT_TIME_ZONE = 'Asia/Manila';
-export const reportRepairs: ReportRepair[] = [];

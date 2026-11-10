@@ -48,6 +48,11 @@ beforeEach(() => {
   cy.intercept('https://tile.openstreetmap.org/**', { fixture: 'map-tile.svg', headers: { 'content-type': 'image/svg+xml' } });
   cy.intercept('POST', '**/rest/v1/rpc/get_my_technician_location', []);
   cy.intercept('POST', '**/rest/v1/rpc/list_located_technicians', []);
+  cy.intercept('POST', '**/rest/v1/rpc/admin_list_applications', []);
+  cy.intercept('POST', '**/rest/v1/rpc/admin_overview', {
+    users: 0, technicians: 0, activeRepairs: 0, completed: 0, applications: 0,
+    weekly: [], recent: [], topTechnicians: [],
+  });
 
   // Repair-request and review sync stay offline by default: every test starts
   // from the browser's own records and specs add fixtures when they need rows.
@@ -70,6 +75,7 @@ beforeEach(() => {
   cy.intercept('POST', '**/rest/v1/reviews*', { statusCode: 201, body: '' });
   cy.intercept('POST', '**/rest/v1/review_replies*', { statusCode: 201, body: '' });
   cy.intercept('POST', '**/storage/v1/object/**', { statusCode: 200, body: { Key: 'repair-photos/test/photo.png' } });
+  cy.intercept('POST', '**/storage/v1/object/list/**', []);
   cy.intercept('POST', '**/storage/v1/object/sign/**', { statusCode: 200, body: [{ signedURL: '/object/sign/repair-photos/test/photo.png' }] });
 });
 

@@ -136,8 +136,7 @@ import {
   initialsOf,
   type TechnicianApplication,
 } from '../../data/technicianApplication';
-import { useTechnicianApplications, type ReviewAction } from '../../stores/technicianApplications';
-import { useAuth } from '../../stores/auth';
+import type { ReviewAction } from '../../stores/technicianApplications';
 import {
   approveApplication,
   rejectApplication,
@@ -146,10 +145,8 @@ import {
 } from '../../services/technicianApplications';
 
 const props = defineProps<{ application: TechnicianApplication | null }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; updated: [] }>();
 
-const store = useTechnicianApplications();
-const { profile } = useAuth();
 
 const note = ref('');
 const actionError = ref('');
@@ -201,26 +198,22 @@ async function act(action: ReviewAction) {
     actionError.value = 'Please add a short note (at least 5 characters) for this action.';
     return;
   }
-  const updated = store.review(props.application!.id, action, note.value.trim(), profile().name);
-  if (updated) {
-    savedMsg.value = `Status updated to "${updated.status}".`;
-    note.value = '';
-    // Persist the decision to Supabase so backend technician profiles/roles stay in sync.
-    try {
+  const message = note.value.trim();
+  try {
       if (action === 'approve') {
         await approveApplication(props.application!.id);
       } else if (action === 'reject') {
-        await rejectApplication(props.application!.id, note.value.trim());
+        await rejectApplication(props.application!.id, message);
       } else if (action === 'request-info') {
-        await requestApplicationInfo(props.application!.id, note.value.trim());
+        await requestApplicationInfo(props.application!.id, message);
       } else if (action === 'start-review') {
         await startApplicationReview(props.application!.id);
       }
-    } catch {
-      // Supabase row may not exist yet (application submitted locally only).
-      // Local approval/rejection is still valid; Supabase sync can happen later.
-    }
-    if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 30);
+    note.value = '';
+    savedMsg.value = 'Application updated.';
+    emit('updated');
+  } catch (cause) {
+    actionError.value = cause instanceof Error ? cause.message : 'Unable to update application in Supabase.';
   }
 }
 </script>

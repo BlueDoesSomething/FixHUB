@@ -150,15 +150,13 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { IonPage } from '@ionic/vue';
 import { useAuth } from '../../stores/auth';
-import { useTechnicianApplications } from '../../stores/technicianApplications';
 import AuthForm from '../../components/landing/home/AuthForm.vue';
 import TechnicianApplicationForm from '../../components/technician/TechnicianApplicationForm.vue';
 import ApplicationStatusCard from '../../components/technician/ApplicationStatusCard.vue';
-import { fetchTechnicianApplications } from '../../services/technicianApplications';
+import { fetchMyTechnicianApplications } from '../../services/technicianApplications';
 import type { ApplicationStatus, TechnicianApplication } from '../../data/technicianApplication';
 
 const { state, profile } = useAuth();
-const store = useTechnicianApplications();
 
 const editing = ref(false);
 const justSubmitted = ref(false);
@@ -170,7 +168,8 @@ const isAuthenticated = computed(() => state.isAuthenticated);
 const currentUserId = computed(() => state.session?.userId ?? '');
 
 function mapSupabaseRowToApplication(row: any): TechnicianApplication {
-  const statusLabel = (row.status as string).charAt(0).toUpperCase() + (row.status as string).slice(1) as ApplicationStatus;
+  const statusLabels: Record<string, ApplicationStatus> = { pending: 'Pending', under_review: 'Under Review', needs_information: 'Needs Information', approved: 'Approved', rejected: 'Rejected' };
+  const statusLabel = statusLabels[row.status as string];
   const serviceTypeMap: Record<string, string> = {
     home: 'Home Service',
     dropoff: 'Drop-off',
@@ -215,7 +214,8 @@ function mapSupabaseRowToApplication(row: any): TechnicianApplication {
 async function loadSupabaseApps() {
   appsLoading.value = true;
   try {
-    const rows = await fetchTechnicianApplications();
+    if (!currentUserId.value) return;
+    const rows = await fetchMyTechnicianApplications(currentUserId.value);
     supabaseApps.value = rows.map(mapSupabaseRowToApplication);
   } catch {
     supabaseApps.value = [];
@@ -225,8 +225,6 @@ async function loadSupabaseApps() {
 }
 
 const myApp = computed(() => {
-  const local = store.mine(me.value?.email ?? '');
-  if (local) return local;
   if (!currentUserId.value) return null;
   return supabaseApps.value.find((a) => a.applicant.userId === currentUserId.value) ?? null;
 });

@@ -6,7 +6,7 @@
         <div class="fx-page__head">
           <div>
             <h1 class="fx-page__title">Reports &amp; Analytics</h1>
-            <p class="fx-page__sub">Explore repair activity, revenue, and the brands repaired most often.</p>
+            <p class="fx-page__sub">Explore completed repairs and the brands repaired most often.</p>
           </div>
         </div>
 
@@ -21,17 +21,13 @@
           <p id="report-date-hint" class="reports__hint">Choose any date within the day, week, month, or year. Weeks run Monday–Sunday; dates use Philippines time (Asia/Manila).</p>
         </section>
 
+        <p v-if="loadError" class="reports__error" role="alert">{{ loadError }}</p>
+        <p v-if="loading" role="status">Loading Supabase reports…</p>
+
         <p v-if="!report" class="reports__error" role="alert">Choose a valid date to see reports.</p>
         <template v-else>
           <p class="reports__range" role="status" data-testid="report-range">{{ report.range.label }} · {{ report.total }} completed {{ report.total === 1 ? 'repair' : 'repairs' }}</p>
           <div class="fx-stat-grid reports__stats">
-            <div class="fx-stat">
-              <div class="fx-stat__icon fx-stat__icon--green">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
-              </div>
-              <p class="fx-stat__value" data-testid="report-revenue">{{ formatRevenue(report.revenueCentavos) }}</p>
-              <p class="fx-stat__label">Completed Repair Revenue</p>
-            </div>
             <div class="fx-stat">
               <div class="fx-stat__icon fx-stat__icon--blue">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6" /></svg>
@@ -73,18 +69,36 @@
 
 <script setup lang="ts">
 import { IonPage, IonContent } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
 import BarChart from '../../components/BarChart.vue';
 import DonutChart from '../../components/DonutChart.vue';
-import { REPORT_PERIODS, REPORT_TIME_ZONE, reportRepairs, type ReportPeriod } from '../../data/reports';
-import { buildRepairReport } from '../../utils/reports';
+import { REPORT_PERIODS, REPORT_TIME_ZONE, type ReportPeriod, type ReportRepair } from '../../data/reports';
+import { buildRepairReport, reportDateRange } from '../../utils/reports';
+import { fetchReportRepairs } from '../../services/adminAnalytics';
 
 const period = ref<ReportPeriod>('month');
 const referenceDate = ref(new Intl.DateTimeFormat('en-CA', { timeZone: REPORT_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()));
-const report = computed(() => buildRepairReport(reportRepairs, period.value, referenceDate.value));
-const currency = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const formatRevenue = (centavos: number) => currency.format(centavos / 100);
+const records = ref<ReportRepair[]>([]);
+const loading = ref(false);
+const loadError = ref('');
+const report = computed(() => buildRepairReport(records.value, period.value, referenceDate.value));
+watch([period, referenceDate], async ([selectedPeriod, date], _old, onCleanup) => {
+  if (!reportDateRange(selectedPeriod, date)) return;
+  let cancelled = false;
+  onCleanup(() => { cancelled = true; });
+  loading.value = true;
+  loadError.value = '';
+  records.value = [];
+  try {
+    const result = await fetchReportRepairs(selectedPeriod, date);
+    if (!cancelled) records.value = result;
+  } catch {
+    if (!cancelled) loadError.value = 'Unable to load reports from Supabase.';
+  } finally {
+    if (!cancelled) loading.value = false;
+  }
+}, { immediate: true });
 </script>
 
 <style scoped>

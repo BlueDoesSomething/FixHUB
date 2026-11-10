@@ -10,6 +10,7 @@ import { createReviewsStore } from '@/stores/reviews';
 import { useAuth } from '@/stores/auth';
 import TopTechnicians from '@/components/admin/TopTechnicians.vue';
 import AdminDashboardPage from '@/views/admin/AdminDashboardPage.vue';
+vi.mock('@/services/adminAnalytics', () => ({ fetchOverview: async () => ({ users: 0, technicians: 0, activeRepairs: 0, completed: 0, applications: 0, weekly: [], recent: [], topTechnicians: [] }), fetchAdminApplications: async () => [] }));
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/data/catalog', async importOriginal => ({
@@ -94,7 +95,7 @@ describe('technician ranking', () => {
 
 describe('admin top technicians', () => {
   test('shows rank, current rating, review count, completed repairs, and combined score', () => {
-    wrapper = mount(TopTechnicians);
+    wrapper = mount(TopTechnicians, { props: { technicians: rankTechnicians(technicians, seedReviews()) } });
     const rows = wrapper.findAll('[data-technician-id]');
     expect(rows).toHaveLength(3);
     expect(rows[0].attributes('data-technician-id')).toBe('1');
@@ -109,11 +110,9 @@ describe('admin top technicians', () => {
     expect(wrapper.text()).not.toMatch(/demo|sample/i);
   });
 
-  test('updates the admin ranking when a customer submits new feedback', async () => {
-    wrapper = mount(TopTechnicians);
-    auth.login('client');
-    store.submitReview('repair-4', 1, 'There is room for improvement.');
-    auth.login('admin');
+  test('updates the admin ranking when Supabase sends new metrics', async () => {
+    wrapper = mount(TopTechnicians, { props: { technicians: rankTechnicians(technicians, seedReviews()) } });
+    await wrapper.setProps({ technicians: rankTechnicians(technicians, [...seedReviews(), review(1, 1, 'new')]) });
     await nextTick();
     const rows = wrapper.findAll('[data-technician-id]');
     expect(rows[0].attributes('data-technician-id')).toBe('2');
@@ -123,16 +122,9 @@ describe('admin top technicians', () => {
   });
 
   test('shows an honest empty state rather than falling back to hard-coded ratings', () => {
-    store.state.reviews = [];
-    wrapper = mount(TopTechnicians);
+    wrapper = mount(TopTechnicians, { props: { technicians: [] } });
     expect(wrapper.findAll('[data-technician-id]')).toHaveLength(0);
     expect(wrapper.text()).toContain('No technicians qualify yet');
-  });
-
-  test('displays a warning when stored reviews could not be read', () => {
-    store.state.storageError = 'Saved reviews could not be read.';
-    wrapper = mount(TopTechnicians);
-    expect(wrapper.get('[role="alert"]').text()).toBe('Saved reviews could not be read.');
   });
 
   test('is included in the admin overview before the weekly repair chart', () => {

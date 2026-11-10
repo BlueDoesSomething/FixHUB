@@ -56,7 +56,7 @@
           </div>
         </div>
 
-        <ApplicationReviewModal v-if="selected" :application="selected" @close="selected = null" />
+        <ApplicationReviewModal v-if="selected" :application="selected" @close="selected = null" @updated="load" />
       </div>
     </ion-content>
   </ion-page>
@@ -69,17 +69,14 @@ import ScreenHeader from '../../components/ScreenHeader.vue';
 import ApplicationReviewModal from '../../components/technician/ApplicationReviewModal.vue';
 import {
   initialsOf,
-  type ApplicationStatus,
   type TechnicianApplication,
 } from '../../data/technicianApplication';
-import { useTechnicianApplications } from '../../stores/technicianApplications';
+import { fetchAdminApplications } from '../../services/adminAnalytics';
 import {
   approveApplication,
   rejectApplication,
-  fetchTechnicianApplications,
 } from '../../services/technicianApplications';
 
-const store = useTechnicianApplications();
 const pending = ref<TechnicianApplication[]>([]);
 const approved = ref<TechnicianApplication[]>([]);
 const loading = ref(false);
@@ -90,57 +87,13 @@ async function load() {
   loading.value = true;
   error.value = '';
   try {
-    // Supabase is the source of truth for applications submitted through the backend.
-    const supabaseApps = await fetchTechnicianApplications();
-    // Map Supabase rows to the store's shape where possible.
-    const fromSupabase = supabaseApps.map((row) => ({
-      id: row.id,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      status: (row.status.charAt(0).toUpperCase() + row.status.slice(1)) as ApplicationStatus,
-      applicant: {
-        userId: row.applicant_id,
-        fullName: row.full_name,
-        email: row.email,
-        contactNumber: row.contact_number,
-        city: row.city,
-      },
-      professional: {
-        yearsExperience: String(row.years_experience),
-        brands: row.brands,
-        specializations: row.specializations,
-        experienceDescription: row.experience_description,
-      },
-      service: {
-        serviceType: row.service_type,
-        coverageArea: row.coverage_area,
-        workingDays: row.working_days,
-        workingHours: row.working_hours,
-      },
-      documents: { certificates: [], workPhotos: [] },
-      review: {
-        reviewer: row.reviewer_id ?? undefined,
-        reviewedAt: row.reviewed_at ?? undefined,
-        feedback: row.feedback ?? undefined,
-      },
-      history: [],
-    }));
-    // Also include locally stored applications (submitted via the app before Supabase wiring).
-    const localApps = store.all().filter((a) => a.status === 'Pending' || a.status === 'Approved');
-    const allApps = [...fromSupabase, ...localApps];
-    // Deduplicate by ID (Supabase takes precedence).
-    const seen = new Set<string>();
-    const unique = allApps.filter((a) => {
-      if (seen.has(a.id)) return false;
-      seen.add(a.id);
-      return true;
-    });
-    pending.value = unique.filter((a) => a.status === 'Pending');
-    approved.value = unique.filter((a) => a.status === 'Approved');
+    const apps = await fetchAdminApplications();
+    pending.value = apps.filter(a => a.status === 'Pending');
+    approved.value = apps.filter(a => a.status === 'Approved');
+    if (selected.value) selected.value = apps.find(a => a.id === selected.value?.id) ?? null;
   } catch (cause) {
-    // If Supabase is not yet wired for applications, fall back to localStorage only.
-    pending.value = store.all().filter((a) => a.status === 'Pending');
-    approved.value = store.all().filter((a) => a.status === 'Approved');
+    pending.value = [];
+    approved.value = [];
     error.value = cause instanceof Error ? cause.message : 'Unable to load applications.';
   } finally {
     loading.value = false;
@@ -152,15 +105,12 @@ function openReview(app: TechnicianApplication) {
 }
 
 async function verify(id: string) {
-  const updated = store.review(id, 'approve', 'Approved via Verify Technicians', 'Admin');
-  if (!updated) return;
   try {
     await approveApplication(id);
-  } catch {
-    // Supabase row may not exist yet (local-only application); local approval is still valid.
+    await load();
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Unable to verify technician.';
   }
-  pending.value = pending.value.filter((a) => a.id !== id);
-  approved.value.push(updated);
 }
 
 async function reject(id: string) {
@@ -171,14 +121,12 @@ async function reject(id: string) {
     alert('Please provide a reason (at least 5 characters).');
     return;
   }
-  const updated = store.review(id, 'reject', note.trim(), 'Admin');
-  if (!updated) return;
   try {
     await rejectApplication(id, note.trim());
-  } catch {
-    // Supabase row may not exist yet; local rejection is still valid.
+    await load();
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Unable to reject application.';
   }
-  pending.value = pending.value.filter((a) => a.id !== id);
 }
 
 onMounted(() => {

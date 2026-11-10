@@ -7,11 +7,11 @@
       </div>
     </header>
 
-    <ol v-if="ranked.length" class="top-techs__list" role="list">
-      <li v-for="(technician, index) in ranked" :key="technician.id" class="top-techs__row" :class="{ 'top-techs__row--first': index === 0 }" :data-technician-id="technician.id">
+    <ol v-if="technicians.length" class="top-techs__list" role="list">
+      <li v-for="(technician, index) in technicians" :key="technician.id" class="top-techs__row" :class="{ 'top-techs__row--first': index === 0 }" :data-technician-id="technician.id">
         <span class="top-techs__rank" :aria-label="`Rank ${index + 1}`">{{ index + 1 }}</span>
         <div class="top-techs__identity">
-          <InitialAvatar :initials="technician.initials" :gradient="technician.color" :size="44" :verified="technician.verified" />
+          <InitialAvatar :initials="technician.name.split(' ').map(part => part[0]).slice(0, 2).join('')" gradient="linear-gradient(135deg, #146344, #3d9870)" :size="44" :verified="true" />
           <div><h3>{{ technician.name }}</h3><p>{{ technician.specialty }}</p></div>
         </div>
         <dl class="top-techs__metrics">
@@ -37,19 +37,16 @@
       <summary>How technicians are ranked</summary>
       <p>{{ TECHNICIAN_RANKING_WEIGHTS.rating * 100 }}% average customer rating (out of 5) + {{ TECHNICIAN_RANKING_WEIGHTS.repairs * 100 }}% completed repair volume (relative to the highest eligible repair total). Shows up to five verified technicians with reviews and completed repairs. Ties use rating, repair total, review count, then name.</p>
     </details>
-    <p v-if="state.storageError" class="top-techs__error" role="alert">{{ state.storageError }}</p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import InitialAvatar from '../InitialAvatar.vue';
-import { technicians } from '../../data/catalog';
-import { useReviews } from '../../stores/reviews';
-import { rankTechnicians, TECHNICIAN_RANKING_WEIGHTS } from '../../utils/technicianRanking';
+import { TECHNICIAN_RANKING_WEIGHTS } from '../../utils/technicianRanking';
+import type { Overview } from '../../services/adminAnalytics';
 
-const { state } = useReviews();
-const ranked = computed(() => rankTechnicians(technicians, state.reviews).slice(0, 5));
+defineProps<{ technicians: Overview['topTechnicians'] }>();
+// Ranking and counts are aggregated by the admin-only Supabase RPC.
 </script>
 
 <style scoped>

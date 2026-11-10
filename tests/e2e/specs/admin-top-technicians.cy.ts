@@ -1,4 +1,17 @@
 describe('admin overview top technicians', () => {
+  it('renders counts, recent requests and leaderboard from Supabase', () => {
+    cy.intercept('POST', '**/rest/v1/rpc/admin_overview', {
+      users: 12, technicians: 3, activeRepairs: 2, completed: 7, applications: 1,
+      weekly: [{ day: '2026-11-10', total: 7 }],
+      recent: [{ id: 'repair-1', reference: 'FH-TEST', device: 'Phone', brand: 'Samsung', status: 'pending', createdAt: new Date().toISOString(), customer: 'Test Customer' }],
+      topTechnicians: [{ id: 'tech-1', name: 'Real Technician', specialty: 'Screens', repairs: 7, averageRating: 4.5, reviewCount: 2, score: 93 }],
+    });
+    cy.signIn('admin');
+    cy.contains('.fx-stat', 'Total Users').should('contain', '12');
+    cy.contains('.fx-stat', 'Completed').should('contain', '7');
+    cy.get('[data-testid="top-technicians"] [data-technician-id="tech-1"]').should('contain', 'Real Technician');
+    cy.contains('Recent Requests').parent().should('contain', 'FH-TEST');
+  });
   beforeEach(() => {
     cy.intercept('https://tile.openstreetmap.org/**', { fixture: 'map-tile.svg', headers: { 'content-type': 'image/svg+xml' } });
   });

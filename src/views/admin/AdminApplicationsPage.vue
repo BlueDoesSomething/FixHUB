@@ -8,7 +8,7 @@
             <h1 class="fx-page__title">Technician Applications</h1>
             <p class="fx-page__sub">Review, request information, and approve technician applications</p>
           </div>
-          <span class="fx-pill fx-pill--accent">{{ store.all().length }} total</span>
+          <span class="fx-pill fx-pill--accent">{{ applications.length }} total</span>
         </div>
 
         <div class="fx-stat-grid apps__stats">
@@ -37,8 +37,9 @@
           </div>
         </div>
 
+        <p v-if="loadError" role="alert">{{ loadError }}</p>
         <div class="fx-table">
-          <div v-if="filtered.length === 0" class="apps__empty">
+          <div v-if="!loadError && filtered.length === 0" class="apps__empty">
             <i data-lucide="inbox" class="apps__empty-ico"></i>
             <p>No applications match your filters.</p>
           </div>
@@ -59,7 +60,7 @@
       </div>
     </ion-content>
 
-    <ApplicationReviewModal :application="selected" @close="selected = null" />
+    <ApplicationReviewModal :application="selected" @close="selected = null" @updated="load" />
   </ion-page>
 </template>
 
@@ -76,9 +77,20 @@ import {
   type ApplicationStatus,
   type TechnicianApplication,
 } from '../../data/technicianApplication';
-import { useTechnicianApplications } from '../../stores/technicianApplications';
+import { fetchAdminApplications } from '../../services/adminAnalytics';
 
-const store = useTechnicianApplications();
+const applications = ref<TechnicianApplication[]>([]);
+const loadError = ref('');
+async function load() {
+  try {
+    applications.value = await fetchAdminApplications();
+    loadError.value = '';
+    if (selected.value) selected.value = applications.value.find(app => app.id === selected.value?.id) ?? null;
+  } catch {
+    applications.value = [];
+    loadError.value = 'Unable to load applications from Supabase.';
+  }
+}
 
 const query = ref('');
 const selected = ref<TechnicianApplication | null>(null);
@@ -87,12 +99,11 @@ type Filter = 'All' | ApplicationStatus;
 const filters: Filter[] = ['All', ...STATUS_ORDER];
 const filter = ref<Filter>('All');
 
-const counts = computed(() => store.counts());
+const counts = computed(() => Object.fromEntries(STATUS_ORDER.map(status => [status, applications.value.filter(app => app.status === status).length])) as Record<ApplicationStatus, number>);
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
-  return store
-    .all()
+  return applications.value
     .filter((a) => (filter.value === 'All' ? true : a.status === filter.value))
     .filter((a) => {
       if (!q) return true;
@@ -111,6 +122,7 @@ function open(app: TechnicianApplication) {
 
 let iconTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
+  void load();
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
     iconTimer = setInterval(() => lucide.createIcons(), 600);

@@ -3,6 +3,17 @@ function loginForReports() {
 }
 
 describe('admin reports and brand repairs', () => {
+  it('uses completed repair rows returned by Supabase', () => {
+    cy.viewport(1280, 900);
+    cy.intercept('GET', '**/rest/v1/repair_requests*', req => {
+      req.reply([{ id: '11111111-1111-4111-8111-111111111111', brand: 'Samsung', status: 'completed',
+        updated_at: new Date().toISOString(), service_type: 'home' }]);
+    });
+    loginForReports();
+    cy.get('.fx-sidenav:visible a[href="/admin/reports"]').click();
+    cy.get('[data-testid="report-total"]').should('have.text', '1');
+    cy.get('[data-testid="report-top-brand"]').should('contain', 'Samsung');
+  });
   it('filters totals and charts across daily, weekly, monthly, and yearly periods', () => {
     cy.viewport(1280, 900);
     loginForReports();
