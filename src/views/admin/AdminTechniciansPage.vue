@@ -24,7 +24,8 @@
             <div
               v-for="app in pending"
               :key="app.id"
-              class="fx-table__row"
+              class="fx-table__row apps__row"
+              @click="openReview(app)"
             >
               <div class="fx-table__avatar">{{ initialsOf(app.applicant.fullName) }}</div>
               <div class="fx-table__info">
@@ -32,8 +33,9 @@
                 <p class="fx-table__sub">{{ app.applicant.email }} • {{ app.professional.yearsExperience }} yr(s)</p>
               </div>
               <div class="fx-table__actions">
-                <button class="fx-btn fx-btn-primary fx-btn--sm" @click="verify(app.id)">Verify</button>
-                <button class="fx-btn fx-btn-ghost fx-btn--sm" @click="reject(app.id)">Reject</button>
+                <button class="fx-btn fx-btn-secondary fx-btn--sm" @click.stop="openReview(app)">Review Details</button>
+                <button class="fx-btn fx-btn-primary fx-btn--sm" @click.stop="verify(app.id)">Verify</button>
+                <button class="fx-btn fx-btn-ghost fx-btn--sm" @click.stop="reject(app.id)">Reject</button>
               </div>
             </div>
           </div>
@@ -53,6 +55,8 @@
             </div>
           </div>
         </div>
+
+        <ApplicationReviewModal v-if="selected" :application="selected" @close="selected = null" />
       </div>
     </ion-content>
   </ion-page>
@@ -62,6 +66,7 @@
 import { ref, onMounted } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
+import ApplicationReviewModal from '../../components/technician/ApplicationReviewModal.vue';
 import {
   initialsOf,
   type ApplicationStatus,
@@ -79,6 +84,7 @@ const pending = ref<TechnicianApplication[]>([]);
 const approved = ref<TechnicianApplication[]>([]);
 const loading = ref(false);
 const error = ref('');
+const selected = ref<TechnicianApplication | null>(null);
 
 async function load() {
   loading.value = true;
@@ -141,6 +147,10 @@ async function load() {
   }
 }
 
+function openReview(app: TechnicianApplication) {
+  selected.value = app;
+}
+
 async function verify(id: string) {
   const updated = store.review(id, 'approve', 'Approved via Verify Technicians', 'Admin');
   if (!updated) return;
@@ -179,6 +189,8 @@ onMounted(() => {
 <style scoped>
 .fx-stack { display: flex; flex-direction: column; gap: 20px; }
 .fx-table__actions { display: flex; gap: 8px; margin-left: auto; }
+.apps__row { cursor: pointer; }
+.apps__row:hover { background: rgba(20, 99, 68, 0.03); }
 .fx-btn-ghost { color: var(--text-dark); }
 .fx-btn-ghost:hover { background: rgba(0, 0, 0, 0.04); }
 </style>
