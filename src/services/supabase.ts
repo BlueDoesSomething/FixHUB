@@ -30,6 +30,16 @@ export function readSupabaseConfig() {
   return { url: parsed.origin, key };
 }
 
+/** True when this build can reach a backend; offline/test builds stay local-only. */
+export function isSupabaseConfigured(): boolean {
+  try {
+    readSupabaseConfig();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 type ClientCache = { client?: SupabaseClient<Database> };
 const hotData = import.meta.hot?.data;
 const cache: ClientCache = hotData?.fixhubSupabase ?? {};

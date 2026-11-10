@@ -3,7 +3,7 @@
     <ScreenHeader title="Repair History" :show-back="false" />
     <ion-content>
       <div class="fx-page">
-        <div class="fx-page__head"><div><h1 class="fx-page__title">Repair History</h1><p class="fx-page__sub">Your submitted requests saved in this browser.</p></div><div class="history-actions"><button class="fx-btn fx-btn-secondary" @click="router.push('/client/reviews')">My Reviews</button><button class="fx-btn fx-btn-primary" @click="router.push('/client/request')">Request a Repair</button></div></div>
+        <div class="fx-page__head"><div><h1 class="fx-page__title">Repair History</h1><p class="fx-page__sub">Your submitted repair requests, on this device and in FIXHUB.</p></div><div class="history-actions"><button class="fx-btn fx-btn-secondary" @click="router.push('/client/reviews')">My Reviews</button><button class="fx-btn fx-btn-primary" @click="router.push('/client/request')">Request a Repair</button></div></div>
         <RepairSaveStatus />
         <p v-if="loading" role="status">Loading your requests…</p>
         <p v-else-if="loadError" role="alert">{{ loadError }}</p>

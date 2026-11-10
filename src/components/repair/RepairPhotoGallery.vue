@@ -16,15 +16,23 @@ import type { RepairPhoto } from '../../data/repair';
 const props = defineProps<{ photos: RepairPhoto[]; removable?: boolean; disabled?: boolean }>();
 const emit = defineEmits<{ remove: [id: string] }>();
 const urls = ref<Record<string, string>>({});
+function release(id: string) {
+  const url = urls.value[id];
+  if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+  delete urls.value[id];
+}
 watch(() => props.photos, photos => {
   for (const id of Object.keys(urls.value)) {
-    if (!photos.some(photo => photo.id === id)) { URL.revokeObjectURL(urls.value[id]); delete urls.value[id]; }
+    if (!photos.some(photo => photo.id === id)) release(id);
   }
   for (const photo of photos) {
-    if (!urls.value[photo.id] && typeof URL.createObjectURL === 'function') urls.value[photo.id] = URL.createObjectURL(photo.blob);
+    if (urls.value[photo.id]) continue;
+    // Backend photos render from a signed Storage URL; local photos from their blob.
+    if (photo.url) { urls.value[photo.id] = photo.url; continue; }
+    if (photo.blob?.size && typeof URL.createObjectURL === 'function') urls.value[photo.id] = URL.createObjectURL(photo.blob);
   }
 }, { deep: true, immediate: true });
-onBeforeUnmount(() => Object.values(urls.value).forEach(url => URL.revokeObjectURL(url)));
+onBeforeUnmount(() => Object.keys(urls.value).forEach(release));
 </script>
 <style scoped>
 .photo-grid { padding: 0; margin: 16px 0 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }

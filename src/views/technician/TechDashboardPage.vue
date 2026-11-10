@@ -75,9 +75,18 @@ const { profile: getProfile, state: authState } = useAuth();
 const locationCard = ref<InstanceType<typeof TechnicianLocationCard> | null>(null);
 const active = ref(true);
 const profile = computed(getProfile);
-const { summary } = useReviews();
-const reviewSummary = computed(() => summary(technicians.find(tech => tech.name === profile.value.name)?.id ?? -1));
-onIonViewWillEnter(() => { active.value = true; void locationCard.value?.refresh(); });
+const { summary, refresh, state: reviewState } = useReviews();
+const reviewSummary = computed(() => summary(
+  technicians.find(tech => tech.name === profile.value.name)?.id
+  ?? reviewState.myTechnicianProfileId
+  ?? -1,
+));
+onIonViewWillEnter(() => {
+  active.value = true;
+  void locationCard.value?.refresh();
+  // Shared ratings arrive from FIXHUB; the computed summary follows reviewState.
+  void refresh();
+});
 onIonViewDidEnter(() => locationCard.value?.resize());
 onIonViewDidLeave(() => { active.value = false; });
 </script>

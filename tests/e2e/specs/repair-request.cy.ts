@@ -13,6 +13,9 @@ describe('repair request workflow', () => {
   });
 
   function fillDetails() {
+    // Electron 118 headless crashes (0xC0000005) while typing into an input
+    // with a <datalist>; detach the suggestions so the workflow stays testable.
+    cy.get('#repair-brand').invoke('removeAttr', 'list');
     cy.get('#repair-brand').type('Samsung');
     cy.get('#repair-model').type('Galaxy Tab S9');
     cy.get('#repair-problem').type('The tablet stops charging after a few minutes.');

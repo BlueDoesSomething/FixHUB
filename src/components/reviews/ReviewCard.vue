@@ -5,11 +5,11 @@
       <div class="review-card__identity"><h3>{{ review.customerName }}</h3><time :datetime="review.createdAt">{{ formatDate(review.createdAt) }}</time></div>
     </header>
     <StarRating :model-value="review.rating" readonly />
-    <p v-if="showTechnician" class="review-card__technician">Review for {{ technician?.name }}</p>
+    <p v-if="showTechnician" class="review-card__technician">Review for {{ technicianName }}</p>
     <p class="review-card__device">{{ review.device }}</p>
     <p v-if="review.comment" class="review-card__comment">{{ review.comment }}</p>
     <div v-if="review.reply" class="review-card__reply">
-      <h4>Response from {{ technician?.name }}</h4>
+      <h4>Response from {{ technicianName }}</h4>
       <time :datetime="review.reply.createdAt">{{ formatDate(review.reply.createdAt) }}</time>
       <p class="review-card__comment">{{ review.reply.comment }}</p>
     </div>
@@ -35,7 +35,8 @@ import { useReviews } from '../../stores/reviews';
 
 const props = defineProps<{ review: RepairReview; canReply?: boolean; showTechnician?: boolean }>();
 const { saveReply } = useReviews();
-const technician = computed(() => technicians.find(tech => tech.id === props.review.technicianId));
+// Local reviews identify technicians by directory id, shared reviews by name from FIXHUB.
+const technicianName = computed(() => technicians.find(tech => tech.id === props.review.technicianId)?.name ?? props.review.technicianName);
 const initials = computed(() => props.review.customerName.split(/\s+/).map(part => part[0]).slice(0, 2).join(''));
 const editing = ref(false);
 const replyText = ref('');

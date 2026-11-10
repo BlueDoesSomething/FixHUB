@@ -30,14 +30,14 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             </div>
             <p class="fx-stat__value">{{ repairState.requests.length }}</p>
-            <p class="fx-stat__label">Requests Saved Locally</p>
+            <p class="fx-stat__label">Repair Requests</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--green">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
-            <p class="fx-stat__value">{{ repairState.requests.length }}</p>
-            <p class="fx-stat__label">Pending · Local Only</p>
+            <p class="fx-stat__value">{{ syncedCount }}</p>
+            <p class="fx-stat__label">Sent to FIXHUB</p>
           </div>
           <div class="fx-stat">
             <div class="fx-stat__icon fx-stat__icon--orange">
@@ -57,7 +57,7 @@
           <h2 class="fx-section-title fx-section-title--lg">Your submitted requests</h2>
           <RepairSaveStatus />
           <LocalRepairRequests v-if="repairState.requests.length" :requests="repairState.requests.slice(0, 3)" />
-          <p v-else class="saved-requests__empty">No local requests submitted yet. Start a repair request to save one here.</p>
+          <p v-else class="saved-requests__empty">No repair requests yet. Start a repair request to send one to FIXHUB.</p>
         </section>
 
         <div class="fx-split">
@@ -128,6 +128,7 @@ const firstName = computed(() => getProfile().name.split(' ')[0]);
 const { draft, state: repairState, initialize } = useRepairDraft();
 const hasDraft = computed(() => !!(draft.brand || draft.model || draft.problem || draft.photos.length));
 const photoCount = computed(() => repairState.requests.reduce((total, request) => total + request.photos.length, 0));
+const syncedCount = computed(() => repairState.requests.filter(request => request.synced).length);
 async function startRequest(device?: string, service?: ServiceType) {
   await initialize();
   if (device) draft.device = device;

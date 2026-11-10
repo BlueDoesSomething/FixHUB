@@ -38,7 +38,7 @@
   </ion-page>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import ScreenHeader from '../../components/ScreenHeader.vue';
@@ -49,7 +49,9 @@ import { useReviews } from '../../stores/reviews';
 
 const route = useRoute();
 const router = useRouter();
-const { mine, pendingRepairs, submitReview } = useReviews();
+const { mine, pendingRepairs, submitReview, refresh } = useReviews();
+// Completed repairs and shared reviews live in FIXHUB, not only in this browser.
+onMounted(() => { void refresh(); });
 const pending = computed(pendingRepairs);
 const written = computed(() => [...mine()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)));
 const repairId = ref('');

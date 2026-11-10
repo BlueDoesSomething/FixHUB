@@ -3,7 +3,79 @@ import { isGeoPoint } from '../utils/map';
 import { devices } from './catalog';
 
 export type ServiceType = 'home' | 'dropoff';
-export type RepairRequestStatus = 'Pending';
+
+/** Lifecycle of a repair request. Local-only records stay 'Pending' until they sync. */
+export type RepairRequestStatus =
+  | 'Pending'
+  | 'Accepted'
+  | 'En Route'
+  | 'Arrived'
+  | 'In Progress'
+  | 'Completed'
+  | 'Cancelled';
+
+const REMOTE_STATUS_LABELS: Record<string, RepairRequestStatus> = {
+  pending: 'Pending',
+  accepted: 'Accepted',
+  en_route: 'En Route',
+  arrived: 'Arrived',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+/** Database enum values are lower snake case; the UI shows spaced labels. */
+export function remoteStatusLabel(status: string): RepairRequestStatus {
+  return REMOTE_STATUS_LABELS[status] ?? 'Pending';
+}
+
+/** Pill class for a request status (matches the fx-pill--* design system). */
+export function statusPillClass(request: Pick<SubmittedRepairRequest, 'status' | 'synced'>): string {
+  if (!request.synced) return 'fx-pill--pending';
+  switch (request.status) {
+    case 'Completed': return 'fx-pill--completed';
+    case 'Cancelled': return 'fx-pill--danger';
+    case 'Pending': return 'fx-pill--progress';
+    default: return 'fx-pill--accent';
+  }
+}
+
+/** A pending, unassigned job as shown in the technician's queue. */
+export interface AvailableRepairJob {
+  id: string;
+  reference: string;
+  device: string;
+  brand: string;
+  model: string;
+  problem: string;
+  serviceType: 'home' | 'dropoff' | 'both';
+  location: string;
+  latitude: number | null;
+  longitude: number | null;
+  createdAt: string;
+}
+
+/** A repair assigned to the signed-in technician, with its live workflow status. */
+export interface AssignedRepairJob extends AvailableRepairJob {
+  status: RepairRequestStatus;
+  /** Database enum value used for the next status transition. */
+  dbStatus: string;
+  customerName: string;
+  updatedAt: string;
+  cancellationReason: string | null;
+}
+
+const NEXT_REPAIR_STEPS: Record<string, { dbStatus: string; label: string }> = {
+  accepted: { dbStatus: 'en_route', label: 'Head to the customer' },
+  en_route: { dbStatus: 'arrived', label: 'Mark as arrived' },
+  arrived: { dbStatus: 'in_progress', label: 'Start the repair' },
+  in_progress: { dbStatus: 'completed', label: 'Mark as completed' },
+};
+
+/** The next allowed workflow step, or null when no transition is available. */
+export function nextRepairStep(dbStatus: string): { dbStatus: string; label: string } | null {
+  return NEXT_REPAIR_STEPS[dbStatus] ?? null;
+}
 
 export const REPAIR_DEVICES = devices.map(device => device.name);
 export const REPAIR_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -16,6 +88,8 @@ export interface RepairPhoto {
   type: string;
   size: number;
   blob: Blob;
+  /** Signed Storage URL for photos loaded from the backend instead of this device. */
+  url?: string;
 }
 
 export interface RepairDraft {
@@ -35,6 +109,11 @@ export interface SubmittedRepairRequest extends RepairDraft {
   reference: string;
   createdAt: string;
   status: RepairRequestStatus;
+  /** True once the request exists in the FIXHUB backend (visible to technicians). */
+  synced?: boolean;
+  updatedAt?: string;
+  /** Reason the backend gave when a sync attempt failed. */
+  syncError?: string;
 }
 
 export type RepairErrors = Partial<Record<'device' | 'brand' | 'model' | 'problem' | 'photos' | 'serviceType' | 'location', string>>;

@@ -1,34 +1,50 @@
 <template>
-  <div class="req-card" :class="{ 'req-card--dropoff': request.type === 'Drop-off' }">
+  <div class="req-card" :class="{ 'req-card--dropoff': request.serviceType !== 'home' }">
     <div class="req-card__top">
       <div class="req-card__customer">
-        <InitialAvatar :initials="request.initials" :gradient="request.color" :size="38" />
+        <InitialAvatar :initials="initials" gradient="linear-gradient(135deg, #146344, #1b7a54)" :size="38" />
         <div>
-          <h4>{{ request.customer }}</h4>
-          <p>{{ request.time }} • {{ request.distance }}</p>
+          <h4>{{ request.brand }} {{ request.model }}</h4>
+          <p>{{ request.reference }} • {{ requestedTime }}</p>
         </div>
       </div>
-      <span class="fx-pill" :class="request.type === 'Home' ? 'fx-pill--progress' : 'fx-pill--accent'">
-        {{ request.type === 'Home' ? '🏠 Home' : '📦 Drop-off' }}
+      <span class="fx-pill" :class="request.serviceType === 'home' ? 'fx-pill--progress' : 'fx-pill--accent'">
+        {{ request.serviceType === 'home' ? '🏠 Home' : '📦 Drop-off' }}
       </span>
     </div>
     <div class="req-card__details">
       <div><span>Device:</span><strong>{{ request.device }}</strong></div>
       <div><span>Problem:</span><strong>{{ request.problem }}</strong></div>
+      <div><span>Location:</span><strong>{{ request.location }}</strong></div>
     </div>
     <div class="req-card__actions">
-      <button class="rc-btn rc-btn--reject" @click="emit('reject', request)">Reject</button>
-      <button class="rc-btn rc-btn--accept" @click="emit('accept', request)">Accept</button>
+      <button class="rc-btn rc-btn--accept" type="button" :disabled="busy" @click="emit('accept', request)">
+        {{ busy ? 'Accepting…' : 'Accept' }}
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import InitialAvatar from './InitialAvatar.vue';
-import type { ServiceRequest } from '../data/catalog';
+import type { AvailableRepairJob } from '../data/repair';
 
-defineProps<{ request: ServiceRequest }>();
-const emit = defineEmits<{ accept: [req: ServiceRequest]; reject: [req: ServiceRequest] }>();
+const props = defineProps<{ request: AvailableRepairJob; busy?: boolean }>();
+const emit = defineEmits<{ accept: [req: AvailableRepairJob] }>();
+
+const initials = computed(() => [props.request.brand, props.request.model]
+  .map(part => part?.trim().charAt(0)).filter(Boolean).join('').slice(0, 2).toUpperCase() || 'FH');
+const requestedTime = computed(() => {
+  const parsed = Date.parse(props.request.createdAt);
+  if (!Number.isFinite(parsed)) return props.request.createdAt;
+  const minutes = Math.round((Date.now() - parsed) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return new Date(parsed).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+});
 </script>
 
 <style scoped>
@@ -58,7 +74,6 @@ const emit = defineEmits<{ accept: [req: ServiceRequest]; reject: [req: ServiceR
   transition: all 0.2s ease;
 }
 .rc-btn--accept { background: var(--primary); color: #fff; }
-.rc-btn--accept:hover { background: var(--primary-dark); }
-.rc-btn--reject { background: var(--bg); color: var(--text-muted); }
-.rc-btn--reject:hover { background: rgba(20, 99, 68, 0.08); color: var(--primary); }
+.rc-btn--accept:hover:not(:disabled) { background: var(--primary-dark); }
+.rc-btn--accept:disabled { opacity: 0.65; cursor: progress; }
 </style>

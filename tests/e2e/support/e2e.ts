@@ -48,6 +48,29 @@ beforeEach(() => {
   cy.intercept('https://tile.openstreetmap.org/**', { fixture: 'map-tile.svg', headers: { 'content-type': 'image/svg+xml' } });
   cy.intercept('POST', '**/rest/v1/rpc/get_my_technician_location', []);
   cy.intercept('POST', '**/rest/v1/rpc/list_located_technicians', []);
+
+  // Repair-request and review sync stay offline by default: every test starts
+  // from the browser's own records and specs add fixtures when they need rows.
+  // Specs may register more specific fixtures afterwards and win the match.
+  cy.intercept('POST', '**/rest/v1/rpc/list_reviews', []);
+  cy.intercept('POST', '**/rest/v1/rpc/list_my_reviewable_repairs', []);
+  // A technician without a profile id (the common case in tests) gets JSON null.
+  cy.intercept('POST', '**/rest/v1/rpc/my_technician_profile_id', req => {
+    req.reply({ statusCode: 200, headers: { 'content-type': 'application/json' }, body: null });
+  });
+  cy.intercept('POST', '**/rest/v1/rpc/list_available_repairs', []);
+  cy.intercept('POST', '**/rest/v1/rpc/list_my_assigned_repairs', []);
+  cy.intercept('POST', '**/rest/v1/rpc/create_my_repair_request', req => req.reply(String(req.body?.p_request_id ?? '11111111-1111-4111-8111-111111111111')));
+  cy.intercept('POST', '**/rest/v1/rpc/accept_repair_request', { statusCode: 204, body: '' });
+  cy.intercept('POST', '**/rest/v1/rpc/advance_repair_status', { statusCode: 204, body: '' });
+  cy.intercept('POST', '**/rest/v1/rpc/cancel_my_repair_request', { statusCode: 204, body: '' });
+  cy.intercept('GET', '**/rest/v1/repair_requests*', []);
+  cy.intercept('GET', '**/rest/v1/repair_photos*', []);
+  cy.intercept('POST', '**/rest/v1/repair_photos*', { statusCode: 201, body: '' });
+  cy.intercept('POST', '**/rest/v1/reviews*', { statusCode: 201, body: '' });
+  cy.intercept('POST', '**/rest/v1/review_replies*', { statusCode: 201, body: '' });
+  cy.intercept('POST', '**/storage/v1/object/**', { statusCode: 200, body: { Key: 'repair-photos/test/photo.png' } });
+  cy.intercept('POST', '**/storage/v1/object/sign/**', { statusCode: 200, body: [{ signedURL: '/object/sign/repair-photos/test/photo.png' }] });
 });
 
 // Alternatively you can use CommonJS syntax:

@@ -10,12 +10,14 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useReviews } from '../../stores/reviews';
 import ReviewCard from './ReviewCard.vue';
 import ReviewSummary from './ReviewSummary.vue';
-const props = defineProps<{ technicianId: number; canReply?: boolean }>();
-const { forTechnician } = useReviews();
+const props = defineProps<{ technicianId: number | string; canReply?: boolean }>();
+const { forTechnician, refresh } = useReviews();
+// Shared reviews live in FIXHUB; pull them in whenever a feed is shown.
+onMounted(() => { void refresh(); });
 const rating = ref(0);
 const sort = ref('newest');
 const reviews = computed(() => forTechnician(props.technicianId));

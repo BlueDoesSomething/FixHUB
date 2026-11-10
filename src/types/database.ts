@@ -462,6 +462,7 @@ export type Database = {
           p_longitude?: number
           p_model: string
           p_problem: string
+          p_request_id?: string
           p_service_type: Database["public"]["Enums"]["service_type"]
         }
         Returns: string
@@ -537,6 +538,58 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_my_assigned_repairs: {
+        Args: never
+        Returns: {
+          brand: string
+          cancellation_reason: string | null
+          created_at: string
+          customer_name: string
+          device: string
+          id: string
+          latitude: number | null
+          location: string
+          longitude: number | null
+          model: string
+          problem: string
+          reference: string
+          service_type: Database["public"]["Enums"]["service_type"]
+          status: Database["public"]["Enums"]["repair_status"]
+          updated_at: string
+        }[]
+      }
+      list_my_reviewable_repairs: {
+        Args: never
+        Returns: {
+          brand: string
+          completed_at: string
+          device: string
+          model: string
+          problem: string
+          reference: string
+          repair_id: string
+          technician_id: string
+          technician_name: string
+        }[]
+      }
+      list_reviews: {
+        Args: never
+        Returns: {
+          comment: string
+          created_at: string
+          customer_id: string
+          customer_name: string
+          device: string
+          id: string
+          rating: number
+          repair_id: string
+          reply_comment: string | null
+          reply_created_at: string | null
+          technician_id: string
+          technician_name: string
+        }[]
+      }
+      my_technician_profile_id: { Args: never; Returns: string | null }
       submit_my_application: {
         Args: {
           p_brands: string[]

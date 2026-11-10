@@ -1,6 +1,8 @@
 import { reactive, watch } from 'vue';
 import { emptyRepairDraft, snapshotRepair, validateRepair, type SubmittedRepairRequest } from '../data/repair';
 import { listRepairRequests, loadRepairDraft, repairStorageMessage, saveRepairDraft, submitRepairRequest } from '../services/repairStorage';
+import { fetchRemoteRepairRequests, mergeRepairRequests, pushRepairRequest } from '../services/repairSync';
+import { isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from './auth';
 
 export type { RepairDraft, ServiceType } from '../data/repair';
@@ -19,6 +21,8 @@ let writeQueue: Promise<unknown> = Promise.resolve();
 let submission: Promise<SubmittedRepairRequest> | undefined;
 let hydrating = false;
 let revision = 0;
+/** Request ids already offered to the backend during this session. */
+const attemptedPushes = new Set<string>();
 
 const auth = useAuth();
 export function repairOwnerId() {
@@ -31,6 +35,7 @@ export function repairOwnerId() {
 watch(() => auth.state.session?.userId, () => {
   clearSaveTimer();
   revision += 1;
+  attemptedPushes.clear();
   replaceDraft(emptyRepairDraft());
   state.requests = [];
   state.ready = false;
@@ -61,6 +66,25 @@ watch(draft, () => {
   saveTimer = setTimeout(() => { void saveDraft().catch(() => undefined); }, 350);
 }, { deep: true, flush: 'sync' });
 
+/** Offer still-local requests to the backend once per session, best effort. */
+function publishPending(ownerId: string) {
+  if (!isSupabaseConfigured()) return;
+  const pending = state.requests.filter(request => !request.synced && !attemptedPushes.has(request.id));
+  if (!pending.length) return;
+  void (async () => {
+    for (const request of pending) {
+      attemptedPushes.add(request.id);
+      const synced = await pushRepairRequest(request, ownerId);
+      if (auth.state.session?.userId !== ownerId) return;
+      state.requests = state.requests.map(item => item.id === request.id
+        ? (synced
+          ? { ...item, synced: true, syncError: undefined }
+          : { ...item, syncError: 'Not sent to FIXHUB yet. It stays on this device.' })
+        : item);
+    }
+  })();
+}
+
 async function initialize() {
   const ownerId = repairOwnerId();
   if (state.ready) return;
@@ -72,9 +96,12 @@ async function initialize() {
       if (auth.state.session?.userId !== ownerId) return;
       // Do not overwrite edits made while the first database read was pending.
       if (saved && revision === initialRevision) replaceDraft(saved);
-      state.requests = requests;
+      const remote = await fetchRemoteRepairRequests(ownerId);
+      if (auth.state.session?.userId !== ownerId) return;
+      state.requests = mergeRepairRequests(requests, remote);
       state.error = '';
       state.saveStatus = saved ? 'saved' : 'idle';
+      publishPending(ownerId);
     } catch (error) {
       if (auth.state.session?.userId !== ownerId) return;
       state.error = repairStorageMessage(error);
@@ -137,7 +164,17 @@ function submit(): Promise<SubmittedRepairRequest> {
       await writeQueue.catch(() => undefined);
       const record = await submitRepairRequest(ownerId, value, next);
       if (auth.state.session?.userId !== ownerId) throw new Error('The signed-in account changed. Open Repair History after signing in again.');
-      state.requests = [record, ...state.requests.filter(request => request.id !== record.id)];
+      let published = record;
+      if (isSupabaseConfigured()) {
+        // Publish before announcing success so the details page shows the real state.
+        attemptedPushes.add(record.id);
+        const synced = await pushRepairRequest(record, ownerId);
+        if (auth.state.session?.userId !== ownerId) throw new Error('The signed-in account changed. Open Repair History after signing in again.');
+        published = synced
+          ? { ...record, synced: true }
+          : { ...record, syncError: 'Not sent to FIXHUB yet. It stays on this device.' };
+      }
+      state.requests = [published, ...state.requests.filter(request => request.id !== published.id)];
       if (revision === submittedRevision) {
         replaceDraft(next);
         state.saveStatus = 'saved';
@@ -145,7 +182,7 @@ function submit(): Promise<SubmittedRepairRequest> {
         // Preserve any newer edit made while the transaction was in progress.
         await saveDraft().catch(() => undefined);
       }
-      return record;
+      return published;
     } catch (error) {
       if (auth.state.session?.userId === ownerId) state.error = repairStorageMessage(error);
       throw error;
@@ -162,8 +199,14 @@ function submit(): Promise<SubmittedRepairRequest> {
 async function refreshRequests() {
   await initialize();
   const ownerId = repairOwnerId();
-  const requests = await listRepairRequests(ownerId);
-  if (auth.state.session?.userId === ownerId) state.requests = requests;
+  const [local, remote] = await Promise.all([
+    listRepairRequests(ownerId),
+    fetchRemoteRepairRequests(ownerId),
+  ]);
+  if (auth.state.session?.userId === ownerId) {
+    state.requests = mergeRepairRequests(local, remote);
+    publishPending(ownerId);
+  }
 }
 
 export function useRepairDraft() {
