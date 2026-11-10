@@ -131,7 +131,12 @@ const showActions = computed(
 
 async function openDashboard() {
   const session = await refreshSession();
-  if (session?.account.role === 'technician' || session?.account.role === 'admin') {
+  // An approved application means the user is a technician; route to the
+  // technician dashboard regardless of the cached session role, which may not
+  // have been refreshed after the admin approval yet.
+  if (props.application.status === 'Approved') {
+    router.push('/technician/dashboard');
+  } else if (session?.account.role === 'technician' || session?.account.role === 'admin') {
     router.push('/technician/dashboard');
   }
 }

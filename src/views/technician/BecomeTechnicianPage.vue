@@ -14,7 +14,7 @@
             <span class="block text-[9px] text-white/60 -mt-1 tracking-widest uppercase">Devices · Repairs</span>
           </div>
         </RouterLink>
-        <RouterLink to="/" class="px-5 py-2.5 rounded-lg bg-white/10 border border-white/25 text-white text-sm font-bold hover:bg-white/20 transition-all">
+        <RouterLink to="/client/home" class="px-5 py-2.5 rounded-lg bg-white/10 border border-white/25 text-white text-sm font-bold hover:bg-white/20 transition-all">
           Back to Home
         </RouterLink>
       </div>
